@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
 import { marketApi } from "../api/client";
+import { useReportDownload } from "../hooks/useReportDownload";
 import type {
   ExposureResponse, ExpirationsResponse, HeatmapResponse, MaxPainResponse, OptionsChainResponse,
   IntelligenceResponse,
@@ -30,8 +31,8 @@ export default function Dashboard() {
   const [intelligence, setIntelligence] = useState<IntelligenceResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [priceInfo, setPriceInfo] = useState<any | null>(null);
+  const { isDownloading, handleDownloadWord } = useReportDownload();
 
   useEffect(() => {
     marketApi.getExpirations({ ticker: TICKER }).then(setExpirations).catch((e) => setError(String(e)));
@@ -69,26 +70,6 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [selectedExp]);
 
-  const handleDownloadWord = async () => {
-    try {
-      setIsDownloading(true);
-      const blob = await marketApi.downloadReport({ ticker: TICKER, expiration: selectedExp });
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = downloadUrl;
-      link.download = `SPY_Intelligence_${selectedExp || "Nearest"}.docx`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(downloadUrl);
-    } catch (e) {
-      console.error(e);
-      alert("Error al descargar el reporte.");
-    } finally {
-      setIsDownloading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-accent/30 font-sans">
       <header className="border-b border-white/10 bg-slate-950/70 px-6 py-6 backdrop-blur-xl">
@@ -121,7 +102,7 @@ export default function Dashboard() {
 
           <div className="flex flex-wrap items-center gap-3">
             <button
-              onClick={handleDownloadWord}
+              onClick={() => handleDownloadWord(TICKER, selectedExp)}
               disabled={isDownloading || !intelligence}
               className="flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-300 transition-all hover:border-emerald-400/40 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
             >

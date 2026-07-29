@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { marketApi } from "../api/client";
 import { Download } from "lucide-react";
+import { useReportDownload } from "../hooks/useReportDownload";
 import StrikeBarsChart from "./StrikeBarsChart";
 
 import MultiLayerHeatmap from "./MultiLayerHeatmap";
@@ -16,7 +17,7 @@ export default function GammaExposureView() {
   const [exposure, setExposure] = useState<ExposureResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isDownloading, setIsDownloading] = useState(false);
+  const { isDownloading, handleDownloadWord } = useReportDownload();
 
   // Control states
   const [showOnlyPositive, setShowOnlyPositive] = useState(false);
@@ -54,26 +55,6 @@ export default function GammaExposureView() {
     return () => clearInterval(interval);
   }, [selectedExp]);
 
-  const handleDownloadWord = async () => {
-    try {
-      setIsDownloading(true);
-      const blob = await marketApi.downloadReport({ ticker: TICKER, expiration: selectedExp });
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = downloadUrl;
-      link.download = `SPY_Gamma_Exposure_${selectedExp || "Nearest"}.docx`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(downloadUrl);
-    } catch (e) {
-      console.error(e);
-      alert("Error al descargar el reporte.");
-    } finally {
-      setIsDownloading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-accent/30 font-sans flex flex-col">
       {/* Header */}
@@ -91,7 +72,7 @@ export default function GammaExposureView() {
         </div>
         <div className="flex items-center gap-4 flex-wrap">
           <button
-            onClick={handleDownloadWord}
+            onClick={() => handleDownloadWord(TICKER, selectedExp)}
             disabled={isDownloading || !exposure}
             className="flex items-center gap-2 bg-secondary border border-border hover:border-accent text-sm font-mono px-4 py-2 rounded-lg transition-all text-foreground disabled:opacity-50 disabled:cursor-not-allowed group"
           >

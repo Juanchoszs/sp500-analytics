@@ -28,6 +28,7 @@ from app.schemas import (
 )
 from app.analytics.index_converter import calculate_index_ratio, convert_exposure_dict, convert_strike
 from app.analytics.docx_generator import generate_docx_report
+from app.routers.helpers import enrich_with_index_data
 from app.analytics.hedging_strength import HedgingStrengthAnalyzer
 from app.analytics.yield_anomaly import YieldAnomalyAnalyzer
 
@@ -113,19 +114,6 @@ def get_price(
 ):
     provider = get_provider()
     price = provider.get_spot_price(ticker)
-    index_price = None
-    index_ticker_formatted = None
-    
-    if ticker == "SPY" and index_ticker is None:
-        index_ticker = "GSPC"
-    
-    if index_ticker:
-        try:
-            index_ticker_formatted = index_ticker if index_ticker.startswith("^") else f"^{index_ticker}"
-            index_price = provider.get_index_price(index_ticker_formatted)
-        except Exception as e:
-            index_price = None
-            logger.exception("Failed to fetch index_price for %s: %s", index_ticker, e)
     
     response = {
         "ticker": ticker,
@@ -133,12 +121,21 @@ def get_price(
         "fetched_at": datetime.now(timezone.utc).isoformat()
     }
     
-    if index_price is not None and index_ticker_formatted is not None:
-        response["index_price"] = index_price
-        response["index_ticker"] = index_ticker_formatted
-        if ticker == "SPY" and index_ticker_formatted == "^GSPC" and price > 0:
-            ratio = calculate_index_ratio(price, index_price)
-            response["index_ratio"] = ratio
+    # Handle custom index_ticker parameter if provided
+    if index_ticker:
+        index_ticker_formatted = index_ticker if index_ticker.startswith("^") else f"^{index_ticker}"
+        try:
+            index_price = provider.get_index_price(index_ticker_formatted)
+            response["index_price"] = index_price
+            response["index_ticker"] = index_ticker_formatted
+            if ticker == "SPY" and index_ticker_formatted == "^GSPC" and price > 0:
+                ratio = calculate_index_ratio(price, index_price)
+                response["index_ratio"] = ratio
+        except Exception as e:
+            logger.exception("Failed to fetch index_price for %s: %s", index_ticker, e)
+    else:
+        # Use default enrichment for SPY
+        response = enrich_with_index_data(response, ticker, price, provider)
     
     return response
 
@@ -174,17 +171,7 @@ def get_options(
         "puts": [to_out(p) for p in chain.puts],
     }
 
-    if ticker == "SPY":
-        try:
-            index_price = provider.get_index_price("^GSPC")
-            if index_price and chain.spot_price > 0:
-                ratio = calculate_index_ratio(chain.spot_price, index_price)
-                resp["index_ticker"] = "^GSPC"
-                resp["index_price"] = index_price
-                resp["index_ratio"] = ratio
-                resp["spot_price_index"] = chain.spot_price * ratio
-        except Exception as e:
-            logger.exception("Failed to fetch index_price for options of %s: %s", ticker, e)
+    resp = enrich_with_index_data(resp, ticker, chain.spot_price, provider)
 
     return OptionsChainResponse(**resp)
 
@@ -223,17 +210,7 @@ def get_greeks(
 
     resp = {"ticker": ticker, "expiration": exp, "spot_price": chain.spot_price, "strikes": out}
 
-    if ticker == "SPY":
-        try:
-            index_price = provider.get_index_price("^GSPC")
-            if index_price and chain.spot_price > 0:
-                ratio = calculate_index_ratio(chain.spot_price, index_price)
-                resp["index_ticker"] = "^GSPC"
-                resp["index_price"] = index_price
-                resp["index_ratio"] = ratio
-                resp["spot_price_index"] = chain.spot_price * ratio
-        except Exception as e:
-            logger.exception("Failed to fetch index_price for greeks of %s: %s", ticker, e)
+    resp = enrich_with_index_data(resp, ticker, chain.spot_price, provider)
 
     return GreeksResponse(**resp)
 
@@ -302,18 +279,11 @@ def get_max_pain(
         "distance_pct": distance_pct,
     }
 
-    # Añadir referencia índice si procede
-    if ticker == "SPY":
-        try:
-            index_price = provider.get_index_price("^GSPC")
-            if index_price and report.spot_price > 0 and report.max_pain is not None:
-                ratio = index_price / report.spot_price
-                resp["index_ticker"] = "^GSPC"
-                resp["index_price"] = index_price
-                resp["index_ratio"] = ratio
-                resp["max_pain_index"] = round(report.max_pain * ratio, 2)
-        except Exception as e:
-            logger.exception("Failed to fetch index_price for max_pain of %s: %s", ticker, e)
+    resp = enrich_with_index_data(resp, ticker, report.spot_price, provider)
+
+    # Add max_pain_index if we have index data and max_pain
+    if ticker == "SPY" and "index_ratio" in resp and report.max_pain is not None:
+        resp["max_pain_index"] = round(report.max_pain * resp["index_ratio"], 2)
 
     return MaxPainResponse(**resp)
 
@@ -389,22 +359,17 @@ def get_intelligence(
     if ticker == "SPY":
         try:
             provider = get_provider()
-            index_price = provider.get_index_price("^GSPC")
-            spy_price = report.get("spot_price", 0) if isinstance(report, dict) else report_dict.get("spot_price", 0)
+            spy_price = report_dict.get("spot_price", 0)
+            report_dict = enrich_with_index_data(report_dict, ticker, spy_price, provider)
 
-            if index_price and spy_price > 0:
-                ratio = calculate_index_ratio(spy_price, index_price)
-                report_dict["index_price"] = index_price
-                report_dict["index_ticker"] = "^GSPC"
-                report_dict["index_ratio"] = ratio
-
-                # Niveles clave en escala ^GSPC (extraídos de gamma_analysis)
+            # Niveles clave en escala ^GSPC (extraídos de gamma_analysis)
+            if "index_ratio" in report_dict:
                 gamma = report_dict.get("gamma_analysis") or {}
                 if isinstance(gamma, dict):
                     for level_key in ("call_wall", "put_wall", "zero_gamma"):
                         val = gamma.get(level_key)
                         if val is not None:
-                            report_dict[f"{level_key}_index"] = round(val * ratio, 2)
+                            report_dict[f"{level_key}_index"] = round(val * report_dict["index_ratio"], 2)
         except Exception as e:
             logger.exception("Failed to fetch index_price for intelligence of %s: %s", ticker, e)
 
