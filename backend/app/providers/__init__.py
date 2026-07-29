@@ -27,3 +27,8 @@ def get_provider() -> DataProvider:
                 f"Implementa DataProvider en app/infrastructure/adapters/{settings.data_provider}_adapter.py"
             )
     return _provider_instance
+
+
+def get_provider_dependency() -> DataProvider:
+    """FastAPI dependency for injecting the DataProvider."""
+    return get_provider()

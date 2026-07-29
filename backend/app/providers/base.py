@@ -11,20 +11,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
+from app.domain.model.market import OptionQuote
 
-
-
-@dataclass
-class OptionQuote:
-    strike: float
-    bid: float
-    ask: float
-    last_price: float
-    volume: int
-    open_interest: int
-    implied_volatility: float
-    contract_type: str  # "call" | "put"
-    in_the_money: bool
 
 
 @dataclass
