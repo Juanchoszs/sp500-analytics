@@ -17,7 +17,7 @@ from app.schemas import (
     HedgingStrengthResponse, YieldAnomalyResponse,
 )
 from app.analytics.index_converter import calculate_index_ratio, convert_exposure_dict
-from app.analytics.docx_generator import generate_docx_report
+from app.analytics.docx_generator import generate_docx_report, ReportConfig
 from app.routers.helpers import enrich_with_index_data
 from app.analytics.hedging_strength import HedgingStrengthAnalyzer
 from app.analytics.yield_anomaly import YieldAnomalyAnalyzer
@@ -169,9 +169,42 @@ def get_query(
 def download_report(
     ticker: str = Query(default=settings.default_ticker),
     expiration: str | None = Query(default=None),
+    include_executive_summary: bool = Query(default=True),
+    include_asset_data: bool = Query(default=True),
+    include_market_interpretation: bool = Query(default=True),
+    include_gamma_exposure: bool = Query(default=True),
+    include_delta_exposure: bool = Query(default=True),
+    include_open_interest: bool = Query(default=True),
+    include_volume: bool = Query(default=True),
+    include_structural_levels: bool = Query(default=True),
+    include_detailed_analysis: bool = Query(default=True),
+    include_scenarios: bool = Query(default=True),
+    include_conclusions: bool = Query(default=True),
+    include_charts: bool = Query(default=True),
+    chart_types: str = Query(default="gex,dex,oi,volume"),
     provider: DataProvider = Depends(get_provider_dependency),
 ):
     exp = _resolve_expiration(ticker, expiration, provider)
+
+    # Parse chart_types from comma-separated string
+    chart_types_list = [ct.strip() for ct in chart_types.split(",") if ct.strip()]
+
+    # Create report configuration
+    config = ReportConfig(
+        include_executive_summary=include_executive_summary,
+        include_asset_data=include_asset_data,
+        include_market_interpretation=include_market_interpretation,
+        include_gamma_exposure=include_gamma_exposure,
+        include_delta_exposure=include_delta_exposure,
+        include_open_interest=include_open_interest,
+        include_volume=include_volume,
+        include_structural_levels=include_structural_levels,
+        include_detailed_analysis=include_detailed_analysis,
+        include_scenarios=include_scenarios,
+        include_conclusions=include_conclusions,
+        include_charts=include_charts,
+        chart_types=chart_types_list,
+    )
 
     report = MarketAnalyzer.generate_intelligence_report(ticker, exp)
 
@@ -228,6 +261,7 @@ def download_report(
         chart_payload,
         chart_source=chart_source,
         chart_ratio=chart_ratio,
+        config=config,
     )
 
     buf_bytes = docx_buffer.getvalue() if hasattr(docx_buffer, "getvalue") else bytes(docx_buffer)

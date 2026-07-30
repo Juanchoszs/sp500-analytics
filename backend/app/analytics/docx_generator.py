@@ -1,5 +1,6 @@
 import io
 from typing import Any
+from dataclasses import dataclass, field
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -11,6 +12,25 @@ from app.analytics.chart_generator import (
     generate_oi_chart,
     generate_volume_chart,
 )
+
+
+@dataclass
+class ReportConfig:
+    """Configuration for Word report generation."""
+    include_executive_summary: bool = True
+    include_asset_data: bool = True
+    include_market_interpretation: bool = True
+    include_gamma_exposure: bool = True
+    include_delta_exposure: bool = True
+    include_open_interest: bool = True
+    include_volume: bool = True
+    include_structural_levels: bool = True
+    include_detailed_analysis: bool = True
+    include_scenarios: bool = True
+    include_conclusions: bool = True
+    include_charts: bool = True
+    chart_types: list[str] = field(default_factory=lambda: ["gex", "dex", "oi", "volume"])
+    language: str = "es"
 
 
 def _g(obj, key, default=None):
@@ -129,7 +149,11 @@ def generate_docx_report(
     chart_exposure: dict[str, Any],
     chart_source: str | None = None,
     chart_ratio: float | None = None,
+    config: ReportConfig = None,
 ) -> io.BytesIO:
+    """Generate Word report with customization options."""
+    if config is None:
+        config = ReportConfig()
     doc = Document()
     
     # Configurar fondo negro para el documento
@@ -155,211 +179,243 @@ def generate_docx_report(
     run.font.size = Pt(12)
     run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
 
+    section_num = 1
+
     # 1. Resumen ejecutivo
-    _add_heading(doc, "1. Resumen Ejecutivo")
-    display_ticker = chart_source if chart_source and chart_source != _g(report, 'ticker', '') else _g(report, 'ticker', 'UNKNOWN')
-    p = doc.add_paragraph(_executive_summary(report, analytics_exposure, display_ticker))
-    for run in p.runs:
-        run.font.size = Pt(11)
-        run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
-
-    # 2. Datos del activo
-    _add_heading(doc, "2. Datos del Activo Analizado")
-    # Confianza puede ser un objeto o una cadena
-    conf_obj = _g(report, 'confidence', None)
-    if isinstance(conf_obj, str) or conf_obj is None:
-        conf_level = conf_obj or 'N/A'
-    else:
-        conf_level = _g(conf_obj, 'level', 'N/A')
-
-    _add_kv_table(doc, [
-        ("Ticker", display_ticker),
-        ("Precio Spot", f"${analytics_exposure['spot_price']:.2f}" if analytics_exposure.get('spot_price') is not None else "N/A"),
-        ("Vencimiento", expiration_val),
-        ("Net GEX", _fmt_money(analytics_exposure.get("net_gamma_exposure"))),
-        ("Net DEX", _fmt_money(analytics_exposure.get("net_delta_exposure"))),
-        ("Put/Call OI Ratio", f"{analytics_exposure.get('put_call_oi_ratio', 0):.3f}"),
-        ("Put/Call Volume Ratio", f"{analytics_exposure.get('put_call_volume_ratio', 0):.3f}"),
-        ("Confianza del Análisis", conf_level),
-    ])
-    if chart_source and chart_source != original_ticker:
-        ratio_note = f" con ratio {chart_ratio:.2f}" if chart_ratio is not None else ""
-        p = doc.add_paragraph(
-            f"Nota: este informe presenta los niveles en {chart_source}{ratio_note} como equivalencia de {original_ticker}, mientras que la analítica cuantitativa subyacente se realizó sobre {original_ticker}."
-        )
-        for run in p.runs:
-            run.font.size = Pt(10)
-            run.font.italic = True
-            run.font.color.rgb = RGBColor(80, 80, 80)
-
-    # 3. Interpretación del mercado
-    _add_heading(doc, "3. Interpretación del Mercado")
-    ga_desc = _g(_g(report, 'gamma_analysis', {}), 'description', '')
-    da_desc = _g(_g(report, 'delta_analysis', {}), 'description', '')
-    dealer_desc = _g(_g(report, 'dealer_analysis', {}), 'description', '')
-    options_desc = _g(_g(report, 'options_analysis', {}), 'sentiment_description', '')
-    for text in (ga_desc, da_desc, dealer_desc, options_desc):
-        if not text:
-            continue
-        p = doc.add_paragraph(text)
+    if config.include_executive_summary:
+        _add_heading(doc, f"{section_num}. Resumen Ejecutivo")
+        section_num += 1
+        display_ticker = chart_source if chart_source and chart_source != _g(report, 'ticker', '') else _g(report, 'ticker', 'UNKNOWN')
+        p = doc.add_paragraph(_executive_summary(report, analytics_exposure, display_ticker))
         for run in p.runs:
             run.font.size = Pt(11)
             run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
 
-    # 4-11. Métricas y gráficos
-    _add_heading(doc, "4. Gamma Exposure")
-    if chart_source and chart_source != original_ticker:
-        if chart_ratio is not None:
-            note = (
-                f"Los gráficos de este informe están representados en {chart_source} como equivalencia de {original_ticker}, "
-                f"utilizando un ratio de conversión de {chart_ratio:.2f}."
-            )
+    # 2. Datos del activo
+    if config.include_asset_data:
+        _add_heading(doc, f"{section_num}. Datos del Activo Analizado")
+        section_num += 1
+        # Confianza puede ser un objeto o una cadena
+        conf_obj = _g(report, 'confidence', None)
+        if isinstance(conf_obj, str) or conf_obj is None:
+            conf_level = conf_obj or 'N/A'
         else:
-            note = (
-                f"Los gráficos de este informe están representados en {chart_source} como equivalencia de {original_ticker}."
+            conf_level = _g(conf_obj, 'level', 'N/A')
+
+        _add_kv_table(doc, [
+            ("Ticker", display_ticker),
+            ("Precio Spot", f"${analytics_exposure['spot_price']:.2f}" if analytics_exposure.get('spot_price') is not None else "N/A"),
+            ("Vencimiento", expiration_val),
+            ("Net GEX", _fmt_money(analytics_exposure.get("net_gamma_exposure"))),
+            ("Net DEX", _fmt_money(analytics_exposure.get("net_delta_exposure"))),
+            ("Put/Call OI Ratio", f"{analytics_exposure.get('put_call_oi_ratio', 0):.3f}"),
+            ("Put/Call Volume Ratio", f"{analytics_exposure.get('put_call_volume_ratio', 0):.3f}"),
+            ("Confianza del Análisis", conf_level),
+        ])
+        if chart_source and chart_source != original_ticker:
+            ratio_note = f" con ratio {chart_ratio:.2f}" if chart_ratio is not None else ""
+            p = doc.add_paragraph(
+                f"Nota: este informe presenta los niveles en {chart_source}{ratio_note} como equivalencia de {original_ticker}, mientras que la analítica cuantitativa subyacente se realizó sobre {original_ticker}."
             )
-        p = doc.add_paragraph(note)
+            for run in p.runs:
+                run.font.size = Pt(10)
+                run.font.italic = True
+                run.font.color.rgb = RGBColor(80, 80, 80)
+
+    # 3. Interpretación del mercado
+    if config.include_market_interpretation:
+        _add_heading(doc, f"{section_num}. Interpretación del Mercado")
+        section_num += 1
+        ga_desc = _g(_g(report, 'gamma_analysis', {}), 'description', '')
+        da_desc = _g(_g(report, 'delta_analysis', {}), 'description', '')
+        dealer_desc = _g(_g(report, 'dealer_analysis', {}), 'description', '')
+        options_desc = _g(_g(report, 'options_analysis', {}), 'sentiment_description', '')
+        for text in (ga_desc, da_desc, dealer_desc, options_desc):
+            if not text:
+                continue
+            p = doc.add_paragraph(text)
+            for run in p.runs:
+                run.font.size = Pt(11)
+                run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
+
+    # 4. Gamma Exposure
+    if config.include_gamma_exposure:
+        _add_heading(doc, f"{section_num}. Gamma Exposure")
+        section_num += 1
+        if chart_source and chart_source != original_ticker:
+            if chart_ratio is not None:
+                note = (
+                    f"Los gráficos de este informe están representados en {chart_source} como equivalencia de {original_ticker}, "
+                    f"utilizando un ratio de conversión de {chart_ratio:.2f}."
+                )
+            else:
+                note = (
+                    f"Los gráficos de este informe están representados en {chart_source} como equivalencia de {original_ticker}."
+                )
+            p = doc.add_paragraph(note)
+            for run in p.runs:
+                run.font.size = Pt(10)
+                run.font.italic = True
+                run.font.color.rgb = RGBColor(80, 80, 80)
+        p = doc.add_paragraph(
+            f"Exposición gamma neta: {_fmt_money(analytics_exposure.get('net_gamma_exposure'))}. "
+            f"{_g(_g(report, 'gamma_analysis', {}), 'expected_behavior', '')}"
+        )
         for run in p.runs:
-            run.font.size = Pt(10)
-            run.font.italic = True
-            run.font.color.rgb = RGBColor(80, 80, 80)
-    p = doc.add_paragraph(
-        f"Exposición gamma neta: {_fmt_money(analytics_exposure.get('net_gamma_exposure'))}. "
-        f"{_g(_g(report, 'gamma_analysis', {}), 'expected_behavior', '')}"
-    )
-    for run in p.runs:
-        run.font.size = Pt(11)
-        run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
-    _add_chart(doc, generate_gex_chart(chart_exposure) if generate_gex_chart else None, "Figura 1 — Perfil de Gamma Exposure por Strike")
- 
-    _add_heading(doc, "5. Delta Exposure")
-    p = doc.add_paragraph(
-        f"Exposición delta neta: {_fmt_money(analytics_exposure.get('net_delta_exposure'))}. "
-        f"{_g(_g(report, 'delta_analysis', {}), 'hedging_pressure', '')}"
-    )
-    for run in p.runs:
-        run.font.size = Pt(11)
-        run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
-    _add_chart(doc, generate_dex_chart(chart_exposure) if generate_dex_chart else None, "Figura 2 — Delta Exposure: Calls, Puts y Net Delta por Strike")
- 
-    _add_heading(doc, "6. Open Interest")
-    options_liquidity = _g(_g(report, 'options_analysis', {}), 'liquidity_zones', '')
-    if options_liquidity:
-        p = doc.add_paragraph(options_liquidity)
-    else:
-        p = doc.add_paragraph("")
-
-    for run in p.runs:
-        run.font.size = Pt(11)
-        run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
-    _add_chart(doc, generate_oi_chart(chart_exposure) if generate_oi_chart else None, "Figura 3 — Distribución de Open Interest por Strike")
-
-    _add_heading(doc, "7. Volumen")
-    p = doc.add_paragraph(
-        f"Ratio Put/Call de volumen: {analytics_exposure.get('put_call_volume_ratio', 0):.3f}. "
-        "Strikes con mayor actividad indican flujo de dinero intradía."
-    )
-    for run in p.runs:
-        run.font.size = Pt(11)
-        run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
-    _add_chart(doc, generate_volume_chart(chart_exposure) if generate_volume_chart else None, "Figura 4 — Volumen de Calls, Puts y Net Volume por Strike")
-
-    _add_heading(doc, "8. Niveles Estructurales")
-    _add_kv_table(doc, [
-        ("Put Wall", _fmt_num(analytics_exposure.get("put_wall"))),
-        ("Call Wall", _fmt_num(analytics_exposure.get("call_wall"))),
-        ("Gamma Flip (Zero Gamma)", _fmt_num(analytics_exposure.get("zero_gamma"))),
-        ("Max Pain", _fmt_num(analytics_exposure.get("max_pain"))),
-        ("Distancia Spot vs Max Pain",
-         _fmt_num(
-             ((analytics_exposure["spot_price"] - analytics_exposure["max_pain"]) / analytics_exposure["spot_price"] * 100)
-             if analytics_exposure.get("max_pain") else None,
-             "%",
-         )),
-    ])
-
-    # Narrativa completa
-    _add_heading(doc, "9. Análisis Cuantitativo Detallado")
-    narrative_text = _g(report, 'narrative', '') or ''
-    for line in str(narrative_text).split("\n"):
-        if line.startswith("# "):
-            _add_heading(doc, line[2:], level=2)
-        elif line.startswith("## "):
-            _add_heading(doc, line[3:], level=3)
-        elif line.startswith("### "):
-            _add_heading(doc, line[4:], level=4)
-        elif line.startswith("- ") or line.startswith("* "):
-            p = doc.add_paragraph(line[2:], style="List Bullet")
-            for run in p.runs:
-                run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
-        elif line.strip():
-            p = doc.add_paragraph(line)
-            for run in p.runs:
-                run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
-
-    _add_heading(doc, "10. Escenarios Probables")
-    scenarios_obj = _g(report, "scenarios", {})
-    for key in ("principal", "alternative", "risk"):
-        sc = _g(scenarios_obj, key, {})
-        sc_name = _g(sc, "name", key.capitalize())
-        _add_heading(doc, sc_name, level=2)
-        p = doc.add_paragraph()
-        prob = _g(sc, "probability_pct", None)
-        conf = _g(sc, "confidence", "")
-        prob_str = f"{prob}%" if prob is not None else "N/A"
-        run = p.add_run(f"Probabilidad: {prob_str} | Confianza: {conf}")
-        run.bold = True
-        run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
-
-        narrative_sc = _g(sc, "narrative", "")
-        if narrative_sc:
-            p = doc.add_paragraph(str(narrative_sc))
-            for run in p.runs:
-                run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
-
-        p = doc.add_paragraph("Factores de soporte:", style="List Bullet")
-        for run in p.runs:
-            run.font.bold = True
+            run.font.size = Pt(11)
             run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
-        for sf in (_g(sc, "supporting_factors", []) or []):
-            p = doc.add_paragraph(str(sf), style="List Bullet")
-            for run in p.runs:
-                run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
+        if config.include_charts and "gex" in config.chart_types:
+            _add_chart(doc, generate_gex_chart(chart_exposure) if generate_gex_chart else None, "Figura 1 — Perfil de Gamma Exposure por Strike")
 
-        p = doc.add_paragraph("Condiciones de invalidación:", style="List Bullet")
+    # 5. Delta Exposure
+    if config.include_delta_exposure:
+        _add_heading(doc, f"{section_num}. Delta Exposure")
+        section_num += 1
+        p = doc.add_paragraph(
+            f"Exposición delta neta: {_fmt_money(analytics_exposure.get('net_delta_exposure'))}. "
+            f"{_g(_g(report, 'delta_analysis', {}), 'hedging_pressure', '')}"
+        )
         for run in p.runs:
-            run.font.bold = True
+            run.font.size = Pt(11)
             run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
-        for inv in (_g(sc, "invalidation_conditions", []) or []):
-            p = doc.add_paragraph(str(inv), style="List Bullet")
+        if config.include_charts and "dex" in config.chart_types:
+            _add_chart(doc, generate_dex_chart(chart_exposure) if generate_dex_chart else None, "Figura 2 — Delta Exposure: Calls, Puts y Net Delta por Strike")
+
+    # 6. Open Interest
+    if config.include_open_interest:
+        _add_heading(doc, f"{section_num}. Open Interest")
+        section_num += 1
+        options_liquidity = _g(_g(report, 'options_analysis', {}), 'liquidity_zones', '')
+        if options_liquidity:
+            p = doc.add_paragraph(options_liquidity)
+        else:
+            p = doc.add_paragraph("")
+
+        for run in p.runs:
+            run.font.size = Pt(11)
+            run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
+        if config.include_charts and "oi" in config.chart_types:
+            _add_chart(doc, generate_oi_chart(chart_exposure) if generate_oi_chart else None, "Figura 3 — Distribución de Open Interest por Strike")
+
+    # 7. Volumen
+    if config.include_volume:
+        _add_heading(doc, f"{section_num}. Volumen")
+        section_num += 1
+        p = doc.add_paragraph(
+            f"Ratio Put/Call de volumen: {analytics_exposure.get('put_call_volume_ratio', 0):.3f}. "
+            "Strikes con mayor actividad indican flujo de dinero intradía."
+        )
+        for run in p.runs:
+            run.font.size = Pt(11)
+            run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
+        if config.include_charts and "volume" in config.chart_types:
+            _add_chart(doc, generate_volume_chart(chart_exposure) if generate_volume_chart else None, "Figura 4 — Volumen de Calls, Puts y Net Volume por Strike")
+
+    # 8. Niveles Estructurales
+    if config.include_structural_levels:
+        _add_heading(doc, f"{section_num}. Niveles Estructurales")
+        section_num += 1
+        _add_kv_table(doc, [
+            ("Put Wall", _fmt_num(analytics_exposure.get("put_wall"))),
+            ("Call Wall", _fmt_num(analytics_exposure.get("call_wall"))),
+            ("Gamma Flip (Zero Gamma)", _fmt_num(analytics_exposure.get("zero_gamma"))),
+            ("Max Pain", _fmt_num(analytics_exposure.get("max_pain"))),
+            ("Distancia Spot vs Max Pain",
+             _fmt_num(
+                 ((analytics_exposure["spot_price"] - analytics_exposure["max_pain"]) / analytics_exposure["spot_price"] * 100)
+                 if analytics_exposure.get("max_pain") else None,
+                 "%",
+             )),
+        ])
+
+    # 9. Narrativa completa
+    if config.include_detailed_analysis:
+        _add_heading(doc, f"{section_num}. Análisis Cuantitativo Detallado")
+        section_num += 1
+        narrative_text = _g(report, 'narrative', '') or ''
+        for line in str(narrative_text).split("\n"):
+            if line.startswith("# "):
+                _add_heading(doc, line[2:], level=2)
+            elif line.startswith("## "):
+                _add_heading(doc, line[3:], level=3)
+            elif line.startswith("### "):
+                _add_heading(doc, line[4:], level=4)
+            elif line.startswith("- ") or line.startswith("* "):
+                p = doc.add_paragraph(line[2:], style="List Bullet")
+                for run in p.runs:
+                    run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
+            elif line.strip():
+                p = doc.add_paragraph(line)
+                for run in p.runs:
+                    run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
+
+    # 10. Escenarios Probables
+    if config.include_scenarios:
+        _add_heading(doc, f"{section_num}. Escenarios Probables")
+        section_num += 1
+        scenarios_obj = _g(report, "scenarios", {})
+        for key in ("principal", "alternative", "risk"):
+            sc = _g(scenarios_obj, key, {})
+            sc_name = _g(sc, "name", key.capitalize())
+            _add_heading(doc, sc_name, level=2)
+            p = doc.add_paragraph()
+            prob = _g(sc, "probability_pct", None)
+            conf = _g(sc, "confidence", "")
+            prob_str = f"{prob}%" if prob is not None else "N/A"
+            run = p.add_run(f"Probabilidad: {prob_str} | Confianza: {conf}")
+            run.bold = True
+            run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
+
+            narrative_sc = _g(sc, "narrative", "")
+            if narrative_sc:
+                p = doc.add_paragraph(str(narrative_sc))
+                for run in p.runs:
+                    run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
+
+            p = doc.add_paragraph("Factores de soporte:", style="List Bullet")
             for run in p.runs:
+                run.font.bold = True
                 run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
+            for sf in (_g(sc, "supporting_factors", []) or []):
+                p = doc.add_paragraph(str(sf), style="List Bullet")
+                for run in p.runs:
+                    run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
 
-    # Conclusiones
-    _add_heading(doc, "11. Conclusiones")
-    scenarios_obj = _g(report, "scenarios", {})
+            p = doc.add_paragraph("Condiciones de invalidación:", style="List Bullet")
+            for run in p.runs:
+                run.font.bold = True
+                run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
+            for inv in (_g(sc, "invalidation_conditions", []) or []):
+                p = doc.add_paragraph(str(inv), style="List Bullet")
+                for run in p.runs:
+                    run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
 
-    # Conclusiones (acceso seguro a campos que pueden ser dicts u objetos)
-    p = doc.add_paragraph(
-        f"Escenario principal ({_g(_g(scenarios_obj, 'principal', {}), 'probability_pct', 'N/A')}): "
-        f"{_g(_g(scenarios_obj, 'principal', {}), 'narrative', '')}"
-    )
-    for run in p.runs:
-        run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
+    # 11. Conclusiones
+    if config.include_conclusions:
+        _add_heading(doc, f"{section_num}. Conclusiones")
+        scenarios_obj = _g(report, "scenarios", {})
 
-    p = doc.add_paragraph(
-        f"Riesgo de cola ({_g(_g(scenarios_obj, 'risk', {}), 'probability_pct', 'N/A')}): "
-        f"{_g(_g(scenarios_obj, 'risk', {}), 'narrative', '')}"
-    )
-    for run in p.runs:
-        run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
+        # Conclusiones (acceso seguro a campos que pueden ser dicts u objetos)
+        p = doc.add_paragraph(
+            f"Escenario principal ({_g(_g(scenarios_obj, 'principal', {}), 'probability_pct', 'N/A')}): "
+            f"{_g(_g(scenarios_obj, 'principal', {}), 'narrative', '')}"
+        )
+        for run in p.runs:
+            run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
 
-    p = doc.add_paragraph(
-        f"Score de riesgo: {_g(_g(report, 'scores', {}), 'risk_score', 0):.0f}%. "
-        f"Volatilidad esperada: {_g(_g(report, 'volatility_analysis', {}), 'description', '')}"
-    )
-    for run in p.runs:
-        run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
+        p = doc.add_paragraph(
+            f"Riesgo de cola ({_g(_g(scenarios_obj, 'risk', {}), 'probability_pct', 'N/A')}): "
+            f"{_g(_g(scenarios_obj, 'risk', {}), 'narrative', '')}"
+        )
+        for run in p.runs:
+            run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
+
+        p = doc.add_paragraph(
+            f"Score de riesgo: {_g(_g(report, 'scores', {}), 'risk_score', 0):.0f}%. "
+            f"Volatilidad esperada: {_g(_g(report, 'volatility_analysis', {}), 'description', '')}"
+        )
+        for run in p.runs:
+            run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
 
     buffer = io.BytesIO()
     doc.save(buffer)
