@@ -9,6 +9,7 @@ from app.config import settings
 from app.domain.application.services import MarketAnalyzerService
 from app.analytics.market_analyzer import MarketAnalyzer
 from app.analytics.query_engine import QueryEngine
+from app.analytics.query_cache import query_cache
 from app.providers import get_provider_dependency
 from app.providers.base import DataProvider
 from app.schemas import (
@@ -137,14 +138,31 @@ def get_query(
     provider: DataProvider = Depends(get_provider_dependency),
 ):
     exp = _resolve_expiration(ticker, expiration, provider)
+    exp_str = exp.strftime("%Y-%m-%d")
+    
+    # Check cache first
+    cached_response = query_cache.get(question_key, ticker, exp_str)
+    if cached_response:
+        logger.info("Cache hit for query: %s, ticker: %s, expiration: %s", question_key, ticker, exp_str)
+        return QueryResponse(**cached_response)
+    
+    # Generate response
+    logger.info("Cache miss for query: %s, ticker: %s, expiration: %s", question_key, ticker, exp_str)
     report = MarketAnalyzer.generate_intelligence_report(ticker, exp)
     answer_dict = QueryEngine.answer_question(question_key, report["query_context"])
-    return QueryResponse(
+    
+    response = QueryResponse(
         question_key=answer_dict["question_key"],
         answer=answer_dict["answer"],
         justification_data=answer_dict["justification_data"],
         confidence=answer_dict["confidence"]
     )
+    
+    # Cache the response
+    answer_dict["ticker"] = ticker
+    query_cache.set(question_key, ticker, exp_str, answer_dict)
+    
+    return response
 
 
 @router.get("/download-report")
@@ -259,3 +277,23 @@ def get_yield_anomaly():
         anomalies=result.anomalies,
         summary=result.summary,
     )
+
+
+@router.get("/cache/stats")
+def get_cache_stats():
+    """Get cache statistics for monitoring."""
+    return query_cache.get_stats()
+
+
+@router.post("/cache/invalidate")
+def invalidate_cache(ticker: str = Query(...)):
+    """Invalidate cache for a specific ticker."""
+    query_cache.invalidate_ticker(ticker)
+    return {"status": "success", "message": f"Cache invalidated for ticker: {ticker}"}
+
+
+@router.post("/cache/clear")
+def clear_cache():
+    """Clear all cache entries."""
+    query_cache.clear()
+    return {"status": "success", "message": "All cache entries cleared"}
