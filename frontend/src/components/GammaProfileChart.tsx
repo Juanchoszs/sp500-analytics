@@ -23,20 +23,33 @@ interface Props {
 export default function GammaProfileChart({ strikes, spotPrice, callWall, putWall, zeroGamma }: Props) {
   const sorted = [...strikes].sort((a, b) => a.strike - b.strike);
   
-  // Filter out far OTM strikes for better visual density
-  const spotIdx = closestIndex(sorted, spotPrice);
-  const startIndex = Math.max(0, spotIdx - 30);
-  const endIndex = Math.min(sorted.length - 1, spotIdx + 30);
-  
-  const displayData = sorted.slice(startIndex, endIndex + 1).map(s => ({
-    strike: s.strike.toString(),
-    gex: s.gamma_exposure,
-    callOi: s.call_oi,
-    putOi: s.put_oi,
-    isCallWall: s.strike === callWall,
-    isPutWall: s.strike === putWall,
-    isZeroGamma: s.strike === zeroGamma,
-  }));
+  // Show all strikes if less than 60, otherwise filter around spot
+  let displayData;
+  if (sorted.length <= 60) {
+    displayData = sorted.map(s => ({
+      strike: s.strike.toString(),
+      gex: s.gamma_exposure,
+      callOi: s.call_oi,
+      putOi: s.put_oi,
+      isCallWall: s.strike === callWall,
+      isPutWall: s.strike === putWall,
+      isZeroGamma: s.strike === zeroGamma,
+    }));
+  } else {
+    const spotIdx = closestIndex(sorted, spotPrice);
+    const startIndex = Math.max(0, spotIdx - 30);
+    const endIndex = Math.min(sorted.length - 1, spotIdx + 30);
+    
+    displayData = sorted.slice(startIndex, endIndex + 1).map(s => ({
+      strike: s.strike.toString(),
+      gex: s.gamma_exposure,
+      callOi: s.call_oi,
+      putOi: s.put_oi,
+      isCallWall: s.strike === callWall,
+      isPutWall: s.strike === putWall,
+      isZeroGamma: s.strike === zeroGamma,
+    }));
+  }
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {

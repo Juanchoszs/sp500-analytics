@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { marketApi } from "../api/client";
+import { AnomalyChart } from "./AnomalyChart";
 import type { YieldAnomalyResponse } from "../types";
 import { Activity, AlertTriangle, TrendingDown, TrendingUp, Minus } from "lucide-react";
 
@@ -10,7 +11,7 @@ export default function YieldAnomalyPanel() {
   useEffect(() => {
     setLoading(true);
     marketApi
-      .getYieldAnomaly()
+      .getYieldAnomaly("^GSPC")
       .then(setData)
       .catch((err) => console.error(err))
       .finally(() => setLoading(false));
@@ -70,8 +71,8 @@ export default function YieldAnomalyPanel() {
             <Activity className="h-4 w-4" />
           </div>
           <div>
-            <h3 className="text-base font-semibold text-white">Yield Anomaly & Credit Stress</h3>
-            <p className="text-[11px] uppercase tracking-wider text-slate-400 font-mono">Rates, Spreads & Macro Dislocation</p>
+            <h3 className="text-base font-semibold text-white">Log Returns Anomaly</h3>
+            <p className="text-[11px] uppercase tracking-wider text-slate-400 font-mono">GSPC - 5m Intraday</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -90,10 +91,22 @@ export default function YieldAnomalyPanel() {
         <div className="sm:col-span-8 p-3.5 bg-slate-900/40 rounded-xl border border-white/5 flex flex-col justify-center">
           <p className="text-xs text-slate-300 leading-relaxed mb-2">{data.summary}</p>
           <div className="flex flex-wrap gap-4 text-xs font-mono text-slate-400 pt-2 border-t border-white/5">
-            <div>Curva 10Y-3M: <span className="text-white font-semibold">{data.curve_spread_2_10}%</span></div>
-            <div>Crédito HYG/LQD: <span className="text-white font-semibold">{data.credit_spread_ratio}</span></div>
+            <div>Precio: <span className="text-white font-semibold">{data.current_price.toFixed(2)}</span></div>
+            <div>Log Return: <span className="text-white font-semibold">{data.current_log_return.toFixed(6)}</span></div>
+            <div>Timeframe: <span className="text-amber-400 font-semibold">5m</span></div>
           </div>
         </div>
+      </div>
+
+      <div className="bg-slate-900/40 rounded-xl border border-white/5 p-4 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs font-semibold text-slate-300 font-mono uppercase tracking-wider">GSPC Candlestick Chart</span>
+          <span className="text-[10px] text-slate-500 font-mono">5m Intraday with Anomaly Annotations</span>
+        </div>
+        <AnomalyChart 
+          ohlcData={data.ohlc_data}
+          anomalyMarkers={data.anomaly_markers} 
+        />
       </div>
 
       <div className="space-y-3 pt-2">

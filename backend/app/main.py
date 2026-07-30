@@ -14,6 +14,8 @@ from app.config import settings
 from app.routers.price import router as price_router
 from app.routers.exposure import router as exposure_router
 from app.routers.intelligence import router as intelligence_router
+from app.routers.yield_curve import router as yield_curve_router
+from app.routers.streaming import router as streaming_router
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
 app = FastAPI(
@@ -37,6 +39,8 @@ app.add_middleware(
 app.include_router(price_router, prefix=settings.api_prefix, tags=["price"])
 app.include_router(exposure_router, prefix=settings.api_prefix, tags=["exposure"])
 app.include_router(intelligence_router, prefix=settings.api_prefix, tags=["intelligence"])
+app.include_router(yield_curve_router, prefix=settings.api_prefix, tags=["yield"])
+app.include_router(streaming_router, prefix=settings.api_prefix, tags=["streaming"])
 
 
 @app.get("/health")

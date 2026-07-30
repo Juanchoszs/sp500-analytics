@@ -3,7 +3,7 @@ import type {
   ExposureResponse, ExpirationsResponse, GreeksResponse, HeatmapResponse,
   MaxPainResponse, OptionsChainResponse, PriceResponse,
   IntelligenceResponse, QueryResponse, QuestionsListResponse,
-  HedgingStrengthResponse, YieldAnomalyResponse,
+  HedgingStrengthResponse, YieldAnomalyResponse, YieldCurveResponse, CreditSpreadHistoryResponse,
 } from "../types";
 
 // El frontend SOLO habla con esta API propia (ver vite.config.ts: /api
@@ -56,6 +56,12 @@ export const marketApi = {
   getHedgingStrength: (params?: QueryParams) =>
     api.get<HedgingStrengthResponse>("/hedging-strength", { params }).then((r) => r.data),
 
-  getYieldAnomaly: () =>
-    api.get<YieldAnomalyResponse>("/yield-anomaly").then((r) => r.data),
+  getYieldAnomaly: (ticker: string = "^GSPC") =>
+    api.get<YieldAnomalyResponse>("/yield-anomaly", { params: { ticker } }).then((r) => r.data),
+
+  getYieldCurve: () =>
+    api.get<YieldCurveResponse>("/yield/curve").then((r) => r.data),
+
+  getCreditSpreadHistory: (days: number = 90) =>
+    api.get<CreditSpreadHistoryResponse>("/yield/credit-spread-history", { params: { days } }).then((r) => r.data),
 };

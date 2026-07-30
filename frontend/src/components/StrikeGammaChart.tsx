@@ -20,20 +20,30 @@ interface Props {
 }
 
 export default function StrikeGammaChart({ strikes, spotPrice, callWall, putWall, zeroGamma }: Props) {
-  // Take a range around spot to make chart readable
   const sorted = [...strikes].sort((a, b) => a.strike - b.strike);
   const spotIdx = closestIndex(sorted, spotPrice);
   
-  // Show ~15 strikes above and below spot
-  const startIndex = Math.max(0, spotIdx - 15);
-  const endIndex = Math.min(sorted.length - 1, spotIdx + 15);
-  
-  const displayData = sorted.slice(startIndex, endIndex + 1).map(s => ({
-    strike: s.strike,
-    gex: s.gamma_exposure,
-    callOi: s.call_oi,
-    putOi: s.put_oi,
-  }));
+  // Show all strikes if less than 30, otherwise filter around spot
+  let displayData;
+  if (sorted.length <= 30) {
+    displayData = sorted.map(s => ({
+      strike: s.strike,
+      gex: s.gamma_exposure,
+      callOi: s.call_oi,
+      putOi: s.put_oi,
+    }));
+  } else {
+    // Show ~15 strikes above and below spot
+    const startIndex = Math.max(0, spotIdx - 15);
+    const endIndex = Math.min(sorted.length - 1, spotIdx + 15);
+    
+    displayData = sorted.slice(startIndex, endIndex + 1).map(s => ({
+      strike: s.strike,
+      gex: s.gamma_exposure,
+      callOi: s.call_oi,
+      putOi: s.put_oi,
+    }));
+  }
 
   const maxAbsGex = Math.max(...displayData.map(d => Math.abs(d.gex)));
   

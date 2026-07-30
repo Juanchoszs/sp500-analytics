@@ -300,16 +300,23 @@ def get_hedging_strength(
 
 
 @router.get("/yield-anomaly", response_model=YieldAnomalyResponse)
-def get_yield_anomaly():
-    result = YieldAnomalyAnalyzer.analyze()
+def get_yield_anomaly(ticker: str = Query(default="^GSPC")):
+    result = YieldAnomalyAnalyzer.analyze(ticker)
     return YieldAnomalyResponse(
         score=result.score,
         expected_direction=result.expected_direction,
         confidence=result.confidence,
-        curve_spread_2_10=result.curve_spread_2_10,
-        credit_spread_ratio=result.credit_spread_ratio,
+        current_price=result.current_price,
+        current_log_return=result.current_log_return,
         anomalies=result.anomalies,
         summary=result.summary,
+        historical_context=result.historical_context,
+        price_history=result.price_history,
+        anomaly_markers=result.anomaly_markers,
+        ohlc_data=result.ohlc_data,
+        log_returns_data=result.log_returns_data,
+        upper_threshold=result.upper_threshold,
+        lower_threshold=result.lower_threshold,
     )
 
 

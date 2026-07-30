@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
 import { marketApi } from "../api/client";
 import { useReportDownload } from "../hooks/useReportDownload";
+import { useMarketDataStream } from "../hooks/useMarketDataStream";
 import type {
   ExposureResponse, ExpirationsResponse, HeatmapResponse, MaxPainResponse, OptionsChainResponse,
   IntelligenceResponse,
@@ -33,6 +34,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [priceInfo, setPriceInfo] = useState<any | null>(null);
   const { isDownloading, handleDownloadWord } = useReportDownload();
+  const { marketData, connected: streamConnected } = useMarketDataStream(TICKER);
 
   useEffect(() => {
     marketApi.getExpirations({ ticker: TICKER }).then(setExpirations).catch((e) => setError(String(e)));
@@ -46,6 +48,18 @@ export default function Dashboard() {
     const interval = setInterval(fetchPrice, 15000);
     return () => clearInterval(interval);
   }, []);
+
+  // Update price info from stream when available
+  useEffect(() => {
+    if (marketData) {
+      setPriceInfo({
+        price: marketData.price,
+        change: marketData.change,
+        change_percent: marketData.change_percent,
+        timestamp: marketData.timestamp,
+      });
+    }
+  }, [marketData]);
 
   useEffect(() => {
     const fetchData = () => {

@@ -282,15 +282,79 @@ export interface AnomalyItemOut {
   score: number;
   description: string;
   impact: string;
+  z_score?: number;
+  timestamp?: string;
 }
 
 export interface YieldAnomalyResponse {
   score: number;
   expected_direction: "Bullish" | "Bearish" | "Neutral";
   confidence: "Low" | "Medium" | "High";
-  curve_spread_2_10: number;
-  credit_spread_ratio: number;
+  current_price: number;
+  current_log_return: number;
   anomalies: AnomalyItemOut[];
   summary: string;
+  historical_context: Record<string, any>;
+  price_history: Array<{
+    timestamp: string;
+    price: number;
+    log_return: number;
+  }>;
+  anomaly_markers: Array<{
+    timestamp: string;
+    price: number;
+    log_return: number;
+    z_score: number;
+    severity: string;
+    type: string;
+    upper_threshold: number;
+    lower_threshold: number;
+  }>;
+  ohlc_data: Array<{
+    timestamp: string;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+  }>;
+  log_returns_data: Array<{
+    timestamp: string;
+    price: number;
+    log_return: number;
+  }>;
+  upper_threshold: Array<{
+    timestamp: string;
+    value: number;
+  }>;
+  lower_threshold: Array<{
+    timestamp: string;
+    value: number;
+  }>;
+}
+
+export interface YieldCurvePoint {
+  maturity: string;
+  rate: number;
+}
+
+export interface YieldCurveResponse {
+  curve: YieldCurvePoint[];
+  spreads: {
+    spread_2_10: number;
+    spread_5_10: number;
+    spread_3m_10y: number;
+  };
+}
+
+export interface CreditSpreadPoint {
+  date: string;
+  ratio: number;
+}
+
+export interface CreditSpreadHistoryResponse {
+  data: CreditSpreadPoint[];
+  current_ratio: number;
+  normal_threshold: number;
+  stressed_threshold: number;
 }
 

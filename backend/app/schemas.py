@@ -1,5 +1,6 @@
 """Modelos de respuesta (Pydantic) — el contrato tipado que ve el frontend."""
 from datetime import date
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -295,14 +296,21 @@ class AnomalyItemOut(BaseModel):
     score: float
     description: str
     impact: str
+    z_score: float | None = None
 
 
 class YieldAnomalyResponse(BaseModel):
     score: float
-    expected_direction: str
-    confidence: str
-    curve_spread_2_10: float
-    credit_spread_ratio: float
+    expected_direction: Literal["Bullish", "Bearish", "Neutral"]
+    confidence: Literal["Low", "Medium", "High"]
+    current_price: float
+    current_log_return: float
     anomalies: list[AnomalyItemOut]
     summary: str
-
+    historical_context: dict[str, Any]
+    price_history: list[dict[str, Any]]
+    anomaly_markers: list[dict[str, Any]]
+    ohlc_data: list[dict[str, Any]]
+    log_returns_data: list[dict[str, Any]]
+    upper_threshold: list[dict[str, Any]]
+    lower_threshold: list[dict[str, Any]]
