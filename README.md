@@ -6,69 +6,288 @@
   <img src="https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite" />
   <img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="TailwindCSS" />
   <img src="https://img.shields.io/badge/Python_3.13-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.13" />
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
   <img src="https://img.shields.io/badge/Licencia-MIT-green?style=for-the-badge" alt="MIT License" />
 </p>
 
-Plataforma profesional e interactiva de **inteligencia de mercado cuantitativa** enfocada en el análisis de opciones del ETF **SPY**. El sistema calcula métricas clave de exposición (GEX, DEX, Vega), modela escenarios de mercado, genera narrativas automatizadas y compila informes descargables en formato Word (`.docx`) con gráficos integrados de alta calidad.
+Sistema avanzado de **inteligencia de mercado cuantitativa** especializado en análisis de opciones del ETF **SPY** con arquitectura de microservicios, procesamiento en tiempo real y capacidades de generación de informes automatizados. El sistema implementa un motor cuantitativo completo basado en el modelo Black-Scholes-Merton, análisis de microestructura de mercado, detección de anomalías en curvas de rendimiento, y generación de narrativas automatizadas mediante procesamiento de lenguaje natural.
 
 ---
 
-## 🔍 Características Principales
+## 🔍 Arquitectura del Sistema
 
-- **Motor Cuantitativo de Opciones:**
-  - Descarga automática de la cadena de opciones de SPY en tiempo real a través de `yfinance`.
-  - Implementación matemática desde cero del modelo **Black-Scholes** para el cálculo de los 5 griegos (Delta, Gamma, Vega, Theta, Rho).
-  - Derivación analítica de métricas avanzadas: GEX (Gamma Exposure), DEX (Delta Exposure), Vega Exposure, Max Pain, Gamma Wall, Call/Put Walls, Zero Gamma (Gamma Flip), Put/Call Ratio, liquidez y probabilidad de pinning.
+### Stack Tecnológico
 
-- **Generador de Reportes Profesionales (DOCX):**
-  - Ubicado en [docx_generator.py](file:///Users/macbookpro/Desktop/spy-intel/backend/app/analytics/docx_generator.py).
-  - Produce un informe ejecutivo estructurado con resúmenes, tablas de datos del mercado, narrativa autogenerada basada en la distribución de la exposición, escenarios simulados y conclusiones.
-  - Inserta gráficos vectoriales nativos (generados mediante `matplotlib`) de GEX, DEX, Open Interest y Volumen.
-  - Diseño seguro y tolerante a fallos que acepta tanto diccionarios como esquemas Pydantic.
+**Backend (Python 3.13+):**
+- **Framework:** FastAPI 0.115.0 con Uvicorn 0.30.6 (ASGI server)
+- **Rate Limiting:** slowapi 0.1.10 (60 requests/min por IP)
+- **CORS:** Configuración multi-origen con Starlette middleware
+- **Validación:** Pydantic 2.9.2 con Pydantic Settings para configuración
+- **Matemáticas Financieras:** Implementación from-scratch de Black-Scholes-Merton
+- **Procesamiento de Datos:** NumPy 2.5.1, Pandas 3.0.3
+- **Generación de Documentos:** python-docx 1.2.0, Matplotlib 3.10.8
+- **Base de Datos:** PostgreSQL con psycopg2-binary 2.9.12, Peewee ORM 4.2.6
+- **Streaming:** SSE (Server-Sent Events) con sse-starlette 1.8.2
+- **Caching:** cachetools 5.5.0 con TTL configurable
 
-- **Backend Robusto (FastAPI):**
-  - Endpoints optimizados con caché TTL en memoria para evitar saturación del proveedor.
-  - Arquitectura limpia que aísla los proveedores de datos bajo la interfaz [DataProvider](file:///Users/macbookpro/Desktop/spy-intel/backend/app/providers/base.py), lo que permite migrar de Yahoo Finance a feeds institucionales (Polygon, ORATS, Theta Data) sin alterar la lógica del negocio.
-  - Soporte opcional para persistencia de snapshots históricos en bases de datos PostgreSQL/SQLAlchemy.
+**Frontend (TypeScript + React 18):**
+- **Build Tool:** Vite 5.4.3 con @vitejs/plugin-react 4.3.1
+- **Type Safety:** TypeScript 5.5.4 con definiciones de tipos completas
+- **UI Framework:** React 18.3.1 + React DOM 18.3.1
+- **Styling:** TailwindCSS 3.4.10 con PostCSS 8.4.45 y Autoprefixer 10.4.20
+- **Data Visualization:** 
+  - Recharts 3.10.0 para gráficos de exposición
+  - Lightweight Charts 4.2.0 para time-series financieras
+- **HTTP Client:** Axios 1.7.7
+- **Utility Libraries:** clsx 2.1.1, tailwind-merge 3.6.0, lucide-react 1.25.0
 
-- **Frontend Moderno (React + TypeScript + Vite):**
-  - Panel visual de control con gráficos interactivos dinámicos de la exposición de opciones (Recharts, Lightweight Charts).
-  - Descarga directa de informes generados dinámicamente en el servidor en un solo clic.
+### Patrón de Arquitectura: Hexagonal/Clean Architecture
+
+El sistema implementa una arquitectura hexagonal que separa claramente la lógica de negocio de la infraestructura:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    PRESENTATION LAYER                         │
+│  ┌─────────────────┐           ┌─────────────────────────┐  │
+│  │  React Frontend  │◄──────────►│   FastAPI Routers       │  │
+│  │  (TypeScript)    │   HTTP    │   (price, exposure,     │  │
+│  │                 │           │    intelligence, etc.)  │  │
+│  └─────────────────┘           └─────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    APPLICATION LAYER                         │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  Analytics Engine (20+ modules)                       │  │
+│  │  - query_engine.py: Query processing & NLP            │  │
+│  │  - narrative_engine.py: Automated report generation    │  │
+│  │  - scenario_engine.py: Monte Carlo scenarios          │  │
+│  │  - confidence_engine.py: Confidence scoring            │  │
+│  │  - yield_anomaly.py: Yield curve anomaly detection     │  │
+│  │  - hedging_strength.py: Hedging position analysis     │  │
+│  └──────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    DOMAIN LAYER                             │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  Domain Models & Business Logic                       │  │
+│  │  - Greeks: Black-Scholes implementation                │  │
+│  │  - Exposure: GEX/DEX/Vega calculations                 │  │
+│  │  - Regimes: Market regime detection                    │  │
+│  │  - Scenarios: Scenario generation logic                │  │
+│  └──────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   INFRASTRUCTURE LAYER                        │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  Data Providers (Hexagonal Ports)                      │  │
+│  │  - DataProvider Interface (base.py)                    │  │
+│  │  - Yahoo Finance Implementation                         │  │
+│  │  - Extensible to Polygon, ORATS, Theta Data            │  │
+│  └──────────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  Caching Layer (TTL-based)                           │  │
+│  │  - Price: 15s TTL                                     │  │
+│  │  - Options Chain: 60s TTL                             │  │
+│  │  - Expirations: 3600s TTL                             │  │
+│  └──────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Módulos de Análisis Avanzado
+
+**Analytics Engine (20+ módulos especializados):**
+
+1. **query_engine.py** (27KB): Motor de procesamiento de consultas con NLP
+2. **docx_generator.py** (23KB): Generación de informes Word con gráficos integrados
+3. **yield_anomaly.py** (15KB): Detección de anomalías en curvas de rendimiento
+4. **narrative_engine.py** (8KB): Generación automatizada de narrativas de mercado
+5. **scenario_engine.py** (12KB): Motor de escenarios Monte Carlo
+6. **rule_engine.py** (11KB): Motor de reglas para detección de patrones
+7. **score_engine.py** (9KB): Sistema de scoring de inteligencia de mercado
+8. **confidence_engine.py** (4KB): Motor de confianza en predicciones
+9. **chart_generator.py** (7KB): Generación de gráficos vectoriales
+10. **market_analyzer.py** (4KB): Análisis de condiciones de mercado
+11. **volatility_analyzer.py** (4KB): Análisis de volatilidad y VIX
+12. **gamma_analyzer.py** (2KB): Análisis de exposición gamma
+13. **delta_analyzer.py** (3KB): Análisis de exposición delta
+14. **dealer_analyzer.py** (2KB): Análisis de posicionamiento de dealers
+15. **options_analyzer.py** (2KB): Análisis de flujo de opciones
+16. **hedging_strength.py** (4KB): Análisis de fuerza de cobertura
+17. **index_converter.py** (4KB): Conversión entre SPY y S&P 500
+18. **query_cache.py** (2KB): Caché de consultas inteligente
 
 ---
 
 ## 🛠️ Estructura del Proyecto
 
-El repositorio está organizado con un desacoplamiento claro entre el backend de análisis y la interfaz de usuario:
+El repositorio sigue una arquitectura monorepo con separación clara de dominios:
 
 ```text
 spy-intel/
-├── .github/                 # Flujos de trabajo y configuraciones de GitHub
-├── backend/                 # API FastAPI y Motor Cuantitativo
+├── backend/                        # FastAPI Backend Service
 │   ├── app/
-│   │   ├── analytics/       # Módulo para cálculo de GEX, DEX, Walls y reporte DOCX
-│   │   ├── db/              # Modelos de base de datos (PostgreSQL/SQLAlchemy opcional)
-│   │   ├── greeks/          # Biblioteca matemática de Black-Scholes desde cero
-│   │   ├── providers/       # Proveedor de datos (Yahoo Finance / adaptadores abstractos)
-│   │   ├── routers/         # Endpoints de la API
-│   │   ├── cache.py         # Caché en memoria con tiempo de expiración (TTL)
-│   │   ├── config.py        # Configuración centralizada de variables de entorno
-│   │   ├── schemas.py       # Modelos de datos Pydantic
-│   │   └── main.py          # Archivo de entrada de la aplicación FastAPI
-│   ├── requirements.txt     # Dependencias de Python
-│   └── run_tests.py         # Runner de pruebas unitarias y de integración
-├── frontend/                # Interfaz de usuario (React + Vite)
-│   ├── src/                 # Componentes, vistas y utilidades de React
-│   ├── package.json         # Dependencias y scripts de Node.js
-│   └── tailwind.config.js   # Estilos CSS de Tailwind
-├── logs/                    # Directorio de registro generado en ejecución
-├── start.sh                 # Script Bash unificado para desarrollo local
-└── README.md                # Este archivo
+│   │   ├── analytics/             # 20+ analytics modules
+│   │   │   ├── query_engine.py    # Query processing & NLP
+│   │   │   ├── docx_generator.py  # Word report generation
+│   │   │   ├── yield_anomaly.py   # Yield curve anomaly detection
+│   │   │   ├── narrative_engine.py # Automated narrative generation
+│   │   │   ├── scenario_engine.py  # Monte Carlo scenarios
+│   │   │   ├── confidence_engine.py # Confidence scoring
+│   │   │   ├── rule_engine.py     # Pattern detection rules
+│   │   │   ├── score_engine.py    # Intelligence scoring
+│   │   │   ├── chart_generator.py # Vector chart generation
+│   │   │   ├── market_analyzer.py # Market conditions
+│   │   │   ├── volatility_analyzer.py # VIX analysis
+│   │   │   ├── gamma_analyzer.py  # Gamma exposure analysis
+│   │   │   ├── delta_analyzer.py  # Delta exposure analysis
+│   │   │   ├── dealer_analyzer.py # Dealer positioning
+│   │   │   ├── options_analyzer.py # Options flow analysis
+│   │   │   ├── hedging_strength.py # Hedging analysis
+│   │   │   ├── index_converter.py # SPY↔S&P 500 conversion
+│   │   │   └── query_cache.py     # Intelligent query caching
+│   │   ├── domain/                # Domain models & business logic
+│   │   ├── infrastructure/        # Infrastructure implementations
+│   │   ├── greeks/                # Black-Scholes implementation
+│   │   │   └── black_scholes.py   # From-scratch BSM with dividend yield
+│   │   ├── providers/             # Data provider interface (hexagonal)
+│   │   │   ├── base.py            # DataProvider abstract interface
+│   │   │   └── __init__.py        # Provider factory
+│   │   ├── routers/               # API endpoints by domain
+│   │   │   ├── price.py           # Price data endpoints
+│   │   │   ├── exposure.py        # Options chain & exposure
+│   │   │   ├── intelligence.py    # Intelligence & analysis
+│   │   │   ├── yield_curve.py     # Yield curve analysis
+│   │   │   ├── streaming.py       # SSE streaming endpoints
+│   │   │   └── helpers.py         # Router utilities
+│   │   ├── cache.py               # TTL-based memory cache
+│   │   ├── config.py              # Centralized configuration
+│   │   ├── schemas.py             # Pydantic models (316 lines)
+│   │   ├── main.py                # FastAPI application entry
+│   │   └── tests/                 # Unit & integration tests
+│   ├── requirements.txt           # Python dependencies
+│   ├── run_tests.py               # Test runner
+│   ├── API_ROUTES.md              # Comprehensive API documentation
+│   └── README.md                  # Backend-specific docs
+├── frontend/                       # React + TypeScript Frontend
+│   ├── src/
+│   │   ├── components/            # 20+ React components
+│   │   │   ├── Dashboard.tsx      # Main dashboard
+│   │   │   ├── IntelligenceReport.tsx # Intelligence report UI
+│   │   │   ├── GammaExposureView.tsx # Gamma visualization
+│   │   │   ├── DeltaExposureChart.tsx # Delta visualization
+│   │   │   ├── VolumeChart.tsx    # Volume analysis
+│   │   │   ├── OpenInterestChart.tsx # OI analysis
+│   │   │   ├── MaxPainCard.tsx    # Max pain display
+│   │   │   ├── LevelsPanel.tsx    # Key levels panel
+│   │   │   ├── MarketProfilePanel.tsx # Market profile
+│   │   │   ├── HedgingStrengthPanel.tsx # Hedging analysis
+│   │   │   ├── YieldAnomalyPanel.tsx # Yield anomaly UI
+│   │   │   ├── YieldCurveChart.tsx # Yield curve visualization
+│   │   │   ├── CreditSpreadChart.tsx # Credit spread analysis
+│   │   │   ├── AnomalyChart.tsx   # Anomaly detection charts
+│   │   │   ├── LogReturnsChart.tsx # Log returns analysis
+│   │   │   ├── GammaProfileChart.tsx # Gamma profile
+│   │   │   ├── StrikeGammaChart.tsx # Strike-specific gamma
+│   │   │   ├── StrikeBarsChart.tsx # Strike bars
+│   │   │   ├── MultiLayerHeatmap.tsx # Advanced heatmap
+│   │   │   ├── IVSmileChart.tsx   # Volatility smile
+│   │   │   ├── OpenInterestTable.tsx # OI table
+│   │   │   ├── MarketQAPanel.tsx  # Market QA panel
+│   │   │   └── AutomaticAnalysisPanel.tsx # Auto-analysis
+│   │   ├── hooks/                 # Custom React hooks
+│   │   │   └── useReportDownload.ts # Report download hook
+│   │   ├── api/                   # API client layer
+│   │   ├── types/                 # TypeScript type definitions
+│   │   │   └── index.ts           # 360+ lines of type definitions
+│   │   ├── App.tsx                # Root component
+│   │   ├── main.tsx               # Entry point
+│   │   └── index.css              # Global styles
+│   ├── package.json               # Node.js dependencies
+│   ├── tsconfig.json              # TypeScript configuration
+│   ├── vite.config.ts             # Vite build configuration
+│   ├── tailwind.config.js         # TailwindCSS configuration
+│   └── postcss.config.js          # PostCSS configuration
+├── Planes/                        # Engineering planning
+│   └── plans/                     # Sprint plans & roadmaps
+├── principal-engineering-auditor/ # Engineering audit tools
+├── design-system/                 # Design system documentation
+├── logs/                          # Runtime logs directory
+├── start.sh                       # Unified development script
+├── engineering-brainstorm.md      # Engineering notes
+└── README.md                      # This file
 ```
 
 ---
 
-## 🚀 Inicio Rápido en Entorno Local
+## � Características Técnicas Principales
+
+### Motor Cuantitativo Black-Scholes-Merton
+- **Implementación from-scratch** sin dependencias de pricing externas
+- **Soporte para dividend yield continuo** (q), crítico para SPY con dividendos trimestrales
+- **Cálculo de 5 griegos:** Delta, Gamma, Vega, Theta, Rho con derivadas analíticas
+- **Manejo de edge cases:** Contratos sin vida útil, IV nula, valores at-boundary
+- **Precisión documentada:** Acepta simplificación europea vs americana (documentada explícitamente)
+
+### Métricas de Exposición Avanzadas
+- **GEX (Gamma Exposure):** Sensibilidad de delta a cambios de precio subyacente
+- **DEX (Delta Exposure):** Exposición delta neta por strike
+- **Vega Exposure:** Sensibilidad a cambios de volatilidad implícita
+- **Max Pain:** Strike donde el dolor máximo para compradores de opciones
+- **Gamma Wall:** Nivel de máxima concentración gamma
+- **Call/Put Walls:** Niveles de máxima concentración OI en calls/puts
+- **Zero Gamma (Gamma Flip):** Punto de inflexión gamma, crítico para regímenes de mercado
+- **Pinning Probability:** Probabilidad estadística de pinning en Max Pain
+- **Put/Call Ratio:** Ratios de volumen y OI para sentimiento
+
+### Sistema de Inteligencia de Mercado
+- **Query Engine con NLP:** Procesamiento de preguntas en lenguaje natural
+- **Scenario Engine:** Generación de escenarios Monte Carlo con 3 variantes
+- **Confidence Engine:** Scoring de confianza con análisis de consistencia
+- **Rule Engine:** Detección de patrones con reglas parametrizables
+- **Score Engine:** Sistema multidimensional de scoring (bullish/bearish/volatility/dealer)
+- **Narrative Engine:** Generación automatizada de narrativas en español
+
+### Análisis de Curva de Rendimiento
+- **Yield Anomaly Detection:** Detección de anomalías en curvas de tesorería
+- **Credit Spread Analysis:** Análisis de spreads corporativos vs soberanos
+- **Log Returns Analysis:** Análisis de retornos logarítmicos con detección de outliers
+- **Z-Score Based Detection:** Identificación estadística de desviaciones
+- **Multi-Metric Integration:** Combina múltiples indicadores de rendimiento
+
+### Generación de Informes Profesionales
+- **DOCX Generation:** Informes Word con gráficos vectoriales nativos
+- **Matplotlib Integration:** Gráficos de alta calidad insertados en documentos
+- **Pydantic Schema Support:** Validación de datos con esquemas tipados
+- **Multi-Section Reports:** Resumen ejecutivo, análisis detallado, escenarios, conclusiones
+- **Dynamic Content:** Contenido generado dinámicamente basado en condiciones de mercado
+
+### Arquitectura de Streaming
+- **Server-Sent Events (SSE):** Streaming en tiempo real de datos de mercado
+- **Event-Driven Updates:** Actualizaciones automáticas en frontend
+- **Connection Management:** Manejo robusto de conexiones SSE
+- **Rate Limiting:** Protección contra abuso con slowapi
+
+### Caching Inteligente
+- **TTL-based Caching:** Cache con tiempo de vida configurable
+- **Multi-level TTL:** 15s (precio), 60s (cadena), 3600s (expiraciones)
+- **Memory-based:** Caché en memoria para máxima velocidad
+- **Provider Protection:** Protección contra saturación de Yahoo Finance
+
+### Index Reference System
+- **SPY ↔ S&P 500 Conversion:** Conversión automática entre ETF e índice
+- **Dual Display:** Visualización simultánea en ambos niveles
+- **Ratio Calculation:** Cálculo dinámico de ratio de conversión
+- **Index Data Integration:** Datos de índice integrados en análisis
+
+---
+
+## �🚀 Inicio Rápido en Entorno Local
 
 ### Requisitos Previos
 

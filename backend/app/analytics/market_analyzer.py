@@ -84,7 +84,8 @@ class MarketAnalyzer:
         )
         
         # 8. Redactar narrativa institucional en lenguaje natural
-        narrative = NarrativeEngine.generate_report(
+        narrative_engine = NarrativeEngine()
+        narrative = narrative_engine.generate_report(
             ticker=ticker,
             spot=chain.spot_price,
             expiration_str=expiration.strftime("%Y-%m-%d"),
@@ -95,7 +96,8 @@ class MarketAnalyzer:
             dealer=dealer_analysis,
             scores=scores,
             confidence=confidence,
-            max_pain=report.max_pain
+            max_pain=report.max_pain,
+            include_evidence=True
         )
 
         

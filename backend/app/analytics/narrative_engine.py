@@ -5,10 +5,22 @@ from app.analytics.volatility_analyzer import VolatilityAnalysis
 from app.analytics.dealer_analyzer import DealerAnalysis
 from app.analytics.score_engine import IntelligenceScores
 from app.analytics.confidence_engine import ConfidenceDetails
+from app.analytics.evidence_engine import (
+    EvidenceEngine,
+    EvidenceCollection,
+    EvidenceItem,
+    EvidenceType,
+    SourceReliability,
+    get_evidence_engine
+)
 
 class NarrativeEngine:
-    @staticmethod
+    def __init__(self):
+        """Initialize NarrativeEngine with evidence engine."""
+        self.evidence_engine = get_evidence_engine()
+    
     def generate_report(
+        self,
         ticker: str,
         spot: float,
         expiration_str: str,
@@ -19,9 +31,17 @@ class NarrativeEngine:
         dealer: DealerAnalysis,
         scores: IntelligenceScores,
         confidence: ConfidenceDetails,
-        max_pain: float | None
+        max_pain: float | None,
+        include_evidence: bool = True
     ) -> str:
-
+        
+        # Create evidence collection for the main conclusion
+        if include_evidence:
+            evidence_collection = self._create_market_evidence_collection(
+                spot, gamma, delta, options, vol, max_pain
+            )
+        else:
+            evidence_collection = None
         
         # Clasificaciones de régimen
         gamma_regime = "Gamma Positiva" if gamma.regime_type == "positive" else "Gamma Negativa"
@@ -29,7 +49,97 @@ class NarrativeEngine:
         bias = "Alcista (Bullish)" if scores.bullish_score > scores.bearish_score + 10 else ("Bajista (Bearish)" if scores.bearish_score > scores.bullish_score + 10 else "Neutral / Lateral")
         
         ticker_label = "S&P 500" if ticker == "^GSPC" else ticker
-        report = f"""# INFORME DE INTELIGENCIA CUANTITATIVA: ESTRUCTURA DE OPCIONES DEL {ticker}
+        
+        # Build report with evidence backing
+        report = self._build_main_report(
+            ticker_label, spot, expiration_str, gamma_regime, dealer_gamma, bias,
+            gamma, delta, options, vol, dealer, scores, confidence, max_pain
+        )
+        
+        # Add evidence section if enabled
+        if include_evidence and evidence_collection:
+            report += self._build_evidence_section(evidence_collection)
+        
+        return report
+    
+    def _create_market_evidence_collection(
+        self,
+        spot: float,
+        gamma: GammaAnalysis,
+        delta: DeltaAnalysis,
+        options: OptionsAnalysis,
+        vol: VolatilityAnalysis,
+        max_pain: float | None
+    ) -> EvidenceCollection:
+        """Create evidence collection for market analysis."""
+        conclusion = f"Market analysis for {spot:.2f} with {gamma.regime_type} gamma regime"
+        collection = self.evidence_engine.create_evidence_collection(conclusion)
+        
+        # Add gamma exposure evidence
+        net_gex = getattr(gamma, 'net_gamma_exposure', 0)
+        collection.add_evidence(self.evidence_engine.create_evidence_item(
+            evidence_type=EvidenceType.SUPPORTING if net_gex > 0 else EvidenceType.CONTRADICTING,
+            source="Gamma Exposure Calculation",
+            value=net_gex,
+            confidence=0.9,
+            reliability=SourceReliability.HIGH,
+            metadata={"metric": "net_gamma_exposure", "regime": gamma.regime_type}
+        ))
+        
+        # Add delta exposure evidence
+        net_dex = getattr(delta, 'net_delta_exposure', 0)
+        collection.add_evidence(self.evidence_engine.create_evidence_item(
+            evidence_type=EvidenceType.SUPPORTING if net_dex > 0 else EvidenceType.CONTRADICTING,
+            source="Delta Exposure Calculation",
+            value=net_dex,
+            confidence=0.85,
+            reliability=SourceReliability.HIGH,
+            metadata={"metric": "net_delta_exposure"}
+        ))
+        
+        # Add VIX evidence
+        vix_current = getattr(vol, 'vix_current', 15)
+        collection.add_evidence(self.evidence_engine.create_evidence_item(
+            evidence_type=EvidenceType.SUPPORTING if vix_current < 18 else EvidenceType.CONTRADICTING,
+            source="VIX Index",
+            value=vix_current,
+            confidence=0.95,
+            reliability=SourceReliability.HIGH,
+            metadata={"metric": "vix_current", "threshold": 18.0}
+        ))
+        
+        # Add put/call ratio evidence
+        pc_ratio = getattr(options, 'put_call_volume_ratio', 1.0)
+        collection.add_evidence(self.evidence_engine.create_evidence_item(
+            evidence_type=EvidenceType.SUPPORTING if pc_ratio < 1.0 else EvidenceType.CONTRADICTING,
+            source="Put/Call Volume Ratio",
+            value=pc_ratio,
+            confidence=0.8,
+            reliability=SourceReliability.MEDIUM,
+            metadata={"metric": "put_call_volume_ratio"}
+        ))
+        
+        return collection
+    
+    def _build_main_report(
+        self,
+        ticker_label: str,
+        spot: float,
+        expiration_str: str,
+        gamma_regime: str,
+        dealer_gamma: str,
+        bias: str,
+        gamma: GammaAnalysis,
+        delta: DeltaAnalysis,
+        options: OptionsAnalysis,
+        vol: VolatilityAnalysis,
+        dealer: DealerAnalysis,
+        scores: IntelligenceScores,
+        confidence: ConfidenceDetails,
+        max_pain: float | None
+    ) -> str:
+        """Build the main report content."""
+        report = f"""# INFORME DE INTELIGENCIA CUANTITATIVA: ESTRUCTURA DE OPCIONES DEL {ticker_label}
 **Vencimiento de Referencia:** {expiration_str} | **Precio Spot:** ${spot:.2f}
 *Documento preparado por el Motor de Inteligencia Cuantitativa. Nivel de Confianza General: **{confidence.level}** ({confidence.consistency_score}% de consistencia).*
 
@@ -104,3 +214,21 @@ El análisis combinado de volatilidad implícita y ratios transaccionales muestr
 La estructura actual del mercado de opciones del {ticker_label} sugiere un sesgo **{bias.lower()}** respaldado por un nivel de confianza **{confidence.level.lower()}**. Operadores e inversores institucionales vigilan atentamente el nivel de **${gamma.zero_gamma if gamma.zero_gamma else "N/A"}** como el pivote decisivo de la sesión. Mientras el precio se mantenga por encima de este nivel, la cobertura estabilizadora de los Dealers favorece compras en los retrocesos técnicos. Una pérdida sistemática del soporte Zero Gamma alertará de un cambio estructural hacia volatilidad amplificada e incremento de coberturas bajistas cortas de delta.
 """
         return report
+    
+    def _build_evidence_section(self, collection: EvidenceCollection) -> str:
+        """Build the evidence section of the report."""
+        evidence_report = self.evidence_engine.generate_evidence_report(collection)
+        
+        section = f"""
+
+---
+
+### VIII. EVIDENCIA Y JUSTIFICACION
+Las conclusiones de este informe están respaldadas por el siguiente análisis de evidencia:
+
+{evidence_report}
+
+*Confianza Total de Evidencia: {collection.total_confidence:.2%}*
+*Calidad de Evidencia: {collection.evidence_quality_score:.2%}*
+"""
+        return section

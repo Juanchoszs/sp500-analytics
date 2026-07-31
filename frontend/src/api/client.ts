@@ -6,6 +6,31 @@ import type {
   HedgingStrengthResponse, YieldAnomalyResponse, YieldCurveResponse, CreditSpreadHistoryResponse,
 } from "../types";
 
+// Tipos para predicciones (temporal hasta que se agreguen a types)
+interface PredictionMetrics {
+  total_predictions: number;
+  correct_predictions: number;
+  accuracy_rate: number;
+  precision: number;
+  recall: number;
+  f1_score: number;
+  calibration_error: number;
+  calibration_score: number;
+}
+
+interface CalibrationReport {
+  ticker: string;
+  prediction_type: string;
+  total_evaluated: number;
+  calibration_score: number;
+  average_calibration_error: number;
+  by_confidence_level: {
+    high: { count: number; accuracy: number; avg_confidence: number };
+    medium: { count: number; accuracy: number; avg_confidence: number };
+    low: { count: number; accuracy: number; avg_confidence: number };
+  };
+}
+
 // El frontend SOLO habla con esta API propia (ver vite.config.ts: /api
 // se proxea a http://localhost:8000). Nunca se importa un SDK de Yahoo
 // aquí — esa es precisamente la regla de arquitectura que pediste.
@@ -64,4 +89,15 @@ export const marketApi = {
 
   getCreditSpreadHistory: (days: number = 90) =>
     api.get<CreditSpreadHistoryResponse>("/yield/credit-spread-history", { params: { days } }).then((r) => r.data),
+
+  // Prediction tracking endpoints
+  getPredictionAccuracy: (ticker: string, predictionType: string, days: number = 30) =>
+    api.get<PredictionMetrics>("/predictions/metrics/accuracy", { 
+      params: { ticker, prediction_type: predictionType, days } 
+    }).then((r) => r.data),
+
+  getPredictionCalibration: (ticker: string, predictionType: string) =>
+    api.get<CalibrationReport>("/predictions/metrics/calibration", { 
+      params: { ticker, prediction_type: predictionType } 
+    }).then((r) => r.data),
 };

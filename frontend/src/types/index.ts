@@ -96,6 +96,9 @@ export interface ExposureResponse {
   call_wall_index?: number | null;
   put_wall_index?: number | null;
   zero_gamma_index?: number | null;
+  display_ticker?: string | null;
+  underlying_ticker?: string | null;
+  spot_price_spy?: number | null;
 }
 
 export interface MaxPainResponse {

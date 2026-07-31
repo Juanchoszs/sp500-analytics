@@ -2,6 +2,14 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 from enum import Enum
+from app.analytics.evidence_engine import (
+    EvidenceEngine,
+    EvidenceCollection,
+    EvidenceItem,
+    EvidenceType,
+    SourceReliability,
+    get_evidence_engine
+)
 
 
 class MarketRegime(Enum):
@@ -25,7 +33,11 @@ class QuestionTemplate:
 
 
 class ResponseBuilder(ABC):
-    """Base class for dynamic response generation."""
+    """Base class for dynamic response generation with evidence attribution."""
+    
+    def __init__(self):
+        """Initialize ResponseBuilder with evidence engine."""
+        self.evidence_engine = get_evidence_engine()
     
     @abstractmethod
     def build_response(self, context: dict[str, Any]) -> dict[str, Any]:
@@ -36,6 +48,73 @@ class ResponseBuilder(ABC):
     def get_confidence(self, context: dict[str, Any]) -> str:
         """Calculate confidence level based on data quality."""
         pass
+    
+    def create_evidence_collection(self, conclusion: str) -> EvidenceCollection:
+        """
+        Create an evidence collection for the response.
+        
+        Args:
+            conclusion: The conclusion being evaluated
+            
+        Returns:
+            EvidenceCollection object
+        """
+        return self.evidence_engine.create_evidence_collection(conclusion)
+    
+    def add_evidence_from_context(
+        self,
+        collection: EvidenceCollection,
+        context: dict[str, Any],
+        evidence_mappings: dict[str, dict[str, Any]]
+    ) -> None:
+        """
+        Add evidence items to collection based on context and mappings.
+        
+        Args:
+            collection: EvidenceCollection to add to
+            context: Market context dictionary
+            evidence_mappings: Mapping of context keys to evidence configuration
+                Format: {
+                    "context_key": {
+                        "source": "Source description",
+                        "expected_direction": "positive|negative|neutral",
+                        "threshold": optional_float,
+                        "confidence": float,
+                        "reliability": "high|medium|low|unknown"
+                    }
+                }
+        """
+        for key, config in evidence_mappings.items():
+            value = context.get(key)
+            if value is None:
+                # Add missing evidence
+                collection.add_evidence(self.evidence_engine.create_evidence_item(
+                    evidence_type=EvidenceType.MISSING,
+                    source=config["source"],
+                    value=None,
+                    confidence=config.get("confidence", 0.5),
+                    reliability=SourceReliability[config.get("reliability", "MEDIUM").upper()],
+                    metadata={"metric": key}
+                ))
+                continue
+            
+            # Classify evidence
+            evidence_type = self.evidence_engine.classify_evidence(
+                value=value,
+                expected_direction=config["expected_direction"],
+                threshold=config.get("threshold"),
+                context=context
+            )
+            
+            # Add evidence item
+            collection.add_evidence(self.evidence_engine.create_evidence_item(
+                evidence_type=evidence_type,
+                source=config["source"],
+                value=value,
+                confidence=config.get("confidence", 0.8),
+                reliability=SourceReliability[config.get("reliability", "MEDIUM").upper()],
+                metadata={"metric": key, "threshold": config.get("threshold")}
+            ))
 
 
 class ResponseTemplate:
@@ -149,40 +228,96 @@ class WhyRisingBuilder(ResponseBuilder):
         if not all([gamma, delta, options]):
             return self._fallback_response(context)
         
+        # Create evidence collection
+        collection = self.create_evidence_collection("Market is rising")
+        
+        # Define evidence mappings
+        evidence_mappings = {
+            "net_gamma_exposure": {
+                "source": "Gamma Exposure Calculation",
+                "expected_direction": "positive",
+                "threshold": 10000000,
+                "confidence": 0.9,
+                "reliability": "high"
+            },
+            "net_delta_exposure": {
+                "source": "Delta Exposure Calculation", 
+                "expected_direction": "positive",
+                "threshold": 5000000,
+                "confidence": 0.85,
+                "reliability": "high"
+            },
+            "put_call_volume_ratio": {
+                "source": "Put/Call Volume Ratio",
+                "expected_direction": "negative",
+                "threshold": 0.85,
+                "confidence": 0.8,
+                "reliability": "medium"
+            }
+        }
+        
+        # Add context for evidence extraction
+        evidence_context = {
+            "net_gamma_exposure": gamma.net_gamma_exposure if hasattr(gamma, 'net_gamma_exposure') else 0,
+            "net_delta_exposure": delta.net_delta_exposure if hasattr(delta, 'net_delta_exposure') else 0,
+            "put_call_volume_ratio": options.put_call_volume_ratio if hasattr(options, 'put_call_volume_ratio') else 1.0
+        }
+        
+        # Add evidence to collection
+        self.add_evidence_from_context(collection, evidence_context, evidence_mappings)
+        
         factors = self._identify_rising_factors(spot, gamma, delta, options, context)
         answer = self._build_narrative(factors, context)
+        
+        # Detect conflicts and gaps
+        conflicts = self.evidence_engine.detect_conflicts(collection)
+        gaps = self.evidence_engine.get_missing_evidence_gaps(collection)
         
         return {
             "question_key": "why_rising",
             "answer": answer,
             "justification_data": self._extract_justification(factors, gamma, delta, options),
-            "confidence": self.get_confidence(context)
+            "confidence": self.get_confidence(context),
+            "evidence_collection": collection.to_dict(),
+            "evidence_summary": collection.get_evidence_summary(),
+            "conflicts": conflicts,
+            "evidence_gaps": gaps,
+            "total_confidence": collection.total_confidence,
+            "evidence_quality_score": collection.evidence_quality_score
         }
     
     def _identify_rising_factors(self, spot: float, gamma: Any, delta: Any, options: Any, context: dict[str, Any]) -> list[dict]:
         factors = []
         
-        if gamma.regime_type == "positive":
+        # Get values with fallback to attribute access
+        net_gex = getattr(gamma, 'net_gamma_exposure', 0) if gamma else 0
+        net_dex = getattr(delta, 'net_delta_exposure', 0) if delta else 0
+        pc_ratio = getattr(options, 'put_call_volume_ratio', 1.0) if options else 1.0
+        gamma_regime = getattr(gamma, 'regime_type', 'unknown') if gamma else 'unknown'
+        delta_regime = getattr(delta, 'regime_type', 'unknown') if delta else 'unknown'
+        options_regime = getattr(options, 'regime_type', 'unknown') if options else 'unknown'
+        
+        if gamma_regime == "positive":
             factors.append({
                 "type": "gamma_regime",
                 "weight": 0.4,
-                "description": f"Régimen Gamma Positiva con Net GEX de ${gamma.net_gamma_exposure:,.0f}",
+                "description": f"Régimen Gamma Positiva con Net GEX de ${net_gex:,.0f}",
                 "impact": "high"
             })
         
-        if delta.regime_type == "call_dominated" or options.regime_type == "call_dominated":
+        if delta_regime == "call_dominated" or options_regime == "call_dominated":
             factors.append({
                 "type": "delta_flow",
                 "weight": 0.3,
-                "description": f"Flujo Delta positivo de ${delta.net_delta_exposure:,.0f}",
+                "description": f"Flujo Delta positivo de ${net_dex:,.0f}",
                 "impact": "high"
             })
         
-        if options.put_call_volume_ratio < 0.85:
+        if pc_ratio < 0.85:
             factors.append({
                 "type": "volume_sentiment",
                 "weight": 0.2,
-                "description": f"Put/Call Volume Ratio bajo ({options.put_call_volume_ratio:.2f})",
+                "description": f"Put/Call Volume Ratio bajo ({pc_ratio:.2f})",
                 "impact": "medium"
             })
         
@@ -227,17 +362,44 @@ class WhyRisingBuilder(ResponseBuilder):
             "primary_factors": [f["type"] for f in factors[:3]],
             "factor_weights": {f["type"]: f["weight"] for f in factors},
             "total_weight": sum(f["weight"] for f in factors),
-            "net_gex": gamma.net_gamma_exposure,
-            "net_dex": delta.net_delta_exposure,
-            "put_call_volume_ratio": options.put_call_volume_ratio
+            "net_gex": getattr(gamma, 'net_gamma_exposure', 0) if gamma else 0,
+            "net_dex": getattr(delta, 'net_delta_exposure', 0) if delta else 0,
+            "put_call_volume_ratio": getattr(options, 'put_call_volume_ratio', 1.0) if options else 1.0
         }
     
     def _fallback_response(self, context: dict[str, Any]) -> dict[str, Any]:
+        # Create evidence collection for insufficient data case
+        collection = self.create_evidence_collection("Insufficient data for analysis")
+        
+        # Add missing evidence items
+        missing_evidence = [
+            ("gamma", "Gamma Analysis"),
+            ("delta", "Delta Analysis"), 
+            ("options", "Options Flow Analysis")
+        ]
+        
+        for key, source in missing_evidence:
+            if context.get(key) is None:
+                collection.add_evidence(self.evidence_engine.create_evidence_item(
+                    evidence_type=EvidenceType.MISSING,
+                    source=source,
+                    value=None,
+                    confidence=0.0,
+                    reliability=SourceReliability.UNKNOWN,
+                    metadata={"metric": key, "reason": "insufficient_data"}
+                ))
+        
         return {
             "question_key": "why_rising",
             "answer": "Datos insuficientes para analizar la subida del precio.",
             "justification_data": {},
-            "confidence": "low"
+            "confidence": "low",
+            "evidence_collection": collection.to_dict(),
+            "evidence_summary": collection.get_evidence_summary(),
+            "conflicts": [],
+            "evidence_gaps": self.evidence_engine.get_missing_evidence_gaps(collection),
+            "total_confidence": collection.total_confidence,
+            "evidence_quality_score": collection.evidence_quality_score
         }
     
     def get_confidence(self, context: dict[str, Any]) -> str:
@@ -270,48 +432,105 @@ class WhyFallingFastBuilder(ResponseBuilder):
         if not all([gamma, delta, options, vol]):
             return self._fallback_response(context)
         
+        # Create evidence collection
+        collection = self.create_evidence_collection("Market is falling fast")
+        
+        # Define evidence mappings for falling market
+        evidence_mappings = {
+            "net_gamma_exposure": {
+                "source": "Gamma Exposure Calculation",
+                "expected_direction": "negative",
+                "threshold": -10000000,
+                "confidence": 0.9,
+                "reliability": "high"
+            },
+            "net_delta_exposure": {
+                "source": "Delta Exposure Calculation",
+                "expected_direction": "negative", 
+                "threshold": -5000000,
+                "confidence": 0.85,
+                "reliability": "high"
+            },
+            "vix_current": {
+                "source": "VIX Index",
+                "expected_direction": "positive",
+                "threshold": 18.0,
+                "confidence": 0.95,
+                "reliability": "high"
+            }
+        }
+        
+        # Add context for evidence extraction
+        evidence_context = {
+            "net_gamma_exposure": getattr(gamma, 'net_gamma_exposure', 0) if gamma else 0,
+            "net_delta_exposure": getattr(delta, 'net_delta_exposure', 0) if delta else 0,
+            "vix_current": getattr(vol, 'vix_current', 15) if vol else 15
+        }
+        
+        # Add evidence to collection
+        self.add_evidence_from_context(collection, evidence_context, evidence_mappings)
+        
         factors = self._identify_falling_factors(spot, gamma, delta, options, vol)
         answer = self._build_narrative(factors, context)
+        
+        # Detect conflicts and gaps
+        conflicts = self.evidence_engine.detect_conflicts(collection)
+        gaps = self.evidence_engine.get_missing_evidence_gaps(collection)
         
         return {
             "question_key": "why_falling_fast",
             "answer": answer,
             "justification_data": self._extract_justification(factors, gamma, delta, vol, spot),
-            "confidence": self.get_confidence(context)
+            "confidence": self.get_confidence(context),
+            "evidence_collection": collection.to_dict(),
+            "evidence_summary": collection.get_evidence_summary(),
+            "conflicts": conflicts,
+            "evidence_gaps": gaps,
+            "total_confidence": collection.total_confidence,
+            "evidence_quality_score": collection.evidence_quality_score
         }
     
     def _identify_falling_factors(self, spot: float, gamma: Any, delta: Any, options: Any, vol: Any) -> list[dict]:
         factors = []
         
-        if gamma.regime_type == "negative":
+        gamma_regime = getattr(gamma, 'regime_type', 'unknown') if gamma else 'unknown'
+        net_gex = getattr(gamma, 'net_gamma_exposure', 0) if gamma else 0
+        net_dex = getattr(delta, 'net_delta_exposure', 0) if delta else 0
+        vix_current = getattr(vol, 'vix_current', 15) if vol else 15
+        
+        if gamma_regime == "negative":
             factors.append({
                 "type": "gamma_regime",
                 "weight": 0.4,
-                "description": f"Régimen Gamma Negativa con Net GEX de ${gamma.net_gamma_exposure:,.0f}",
+                "description": f"Régimen Gamma Negativa con Net GEX de ${net_gex:,.0f}",
                 "impact": "high"
             })
         
-        if delta.regime_type == "put_dominated" or options.regime_type == "put_dominated":
+        delta_regime = getattr(delta, 'regime_type', 'unknown') if delta else 'unknown'
+        options_regime = getattr(options, 'regime_type', 'unknown') if options else 'unknown'
+        put_wall = getattr(gamma, 'put_wall', None) if gamma else None
+        
+        if delta_regime == "put_dominated" or options_regime == "put_dominated":
             factors.append({
                 "type": "delta_flow",
                 "weight": 0.3,
-                "description": f"Dominancia de Puts con Net DEX de ${delta.net_delta_exposure:,.0f}",
+                "description": f"Dominancia de Puts con Net DEX de ${net_dex:,.0f}",
                 "impact": "high"
             })
         
-        if vol.vix_current > 18.0:
+        if vix_current > 18.0:
             factors.append({
                 "type": "volatility",
                 "weight": 0.2,
-                "description": f"VIX elevado ({vol.vix_current:.2f}) expandiendo rangos de caída",
+                "description": f"VIX elevado ({vix_current:.2f}) expandiendo rangos de caída",
                 "impact": "medium"
             })
         
-        if gamma.put_wall and spot < gamma.put_wall:
+        if put_wall and spot < put_wall:
             factors.append({
                 "type": "support_breach",
                 "weight": 0.1,
-                "description": f"Precio penetró Put Wall (${gamma.put_wall:.2f})",
+                "description": f"Precio penetró Put Wall (${put_wall:.2f})",
                 "impact": "low"
             })
         

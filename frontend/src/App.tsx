@@ -1,9 +1,10 @@
 import { useState } from "react";
 import Dashboard from "./components/Dashboard";
 import GammaExposureView from "./components/GammaExposureView";
+import PredictionDashboard from "./components/PredictionDashboard";
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<"dashboard" | "gamma">("dashboard");
+  const [currentView, setCurrentView] = useState<"dashboard" | "gamma" | "predictions">("dashboard");
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -38,13 +39,29 @@ export default function App() {
                   : "text-slate-300 hover:bg-white/5 hover:text-white"
               }`}
             >
-              Gamma Exposure Module
+              Gamma Exposure
+            </button>
+            <button
+              onClick={() => setCurrentView("predictions")}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
+                currentView === "predictions"
+                  ? "bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20"
+                  : "text-slate-300 hover:bg-white/5 hover:text-white"
+              }`}
+            >
+              Prediction Metrics
             </button>
           </div>
         </div>
       </nav>
 
-      {currentView === "dashboard" ? <Dashboard /> : <GammaExposureView />}
+      {currentView === "dashboard" ? (
+        <Dashboard />
+      ) : currentView === "gamma" ? (
+        <GammaExposureView />
+      ) : (
+        <PredictionDashboard />
+      )}
     </div>
   );
 }

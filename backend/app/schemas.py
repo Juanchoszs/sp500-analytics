@@ -1,8 +1,9 @@
 """Modelos de respuesta (Pydantic) — el contrato tipado que ve el frontend."""
-from datetime import date
+from datetime import date, datetime
 from typing import Any, Literal
+from enum import Enum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class PriceResponse(BaseModel):
@@ -314,3 +315,217 @@ class YieldAnomalyResponse(BaseModel):
     log_returns_data: list[dict[str, Any]]
     upper_threshold: list[dict[str, Any]]
     lower_threshold: list[dict[str, Any]]
+
+
+# Evidence Engine Schemas
+
+class EvidenceTypeEnum(str, Enum):
+    """Enumeration for evidence types."""
+    SUPPORTING = "supporting"
+    CONTRADICTING = "contradicting"
+    MISSING = "missing"
+    NEUTRAL = "neutral"
+
+
+class SourceReliabilityEnum(str, Enum):
+    """Enumeration for source reliability levels."""
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    UNKNOWN = "unknown"
+
+
+class EvidenceItemOut(BaseModel):
+    """Schema for individual evidence items."""
+    type: EvidenceTypeEnum
+    source: str
+    value: Any
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence score between 0.0 and 1.0")
+    reliability: SourceReliabilityEnum
+    timestamp: str
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    weight: float = Field(description="Calculated weight based on confidence and reliability")
+
+
+class EvidenceSummaryOut(BaseModel):
+    """Schema for evidence collection summary."""
+    conclusion: str
+    supporting_count: int
+    contradicting_count: int
+    missing_count: int
+    neutral_count: int
+    total_confidence: float = Field(ge=0.0, le=1.0)
+    evidence_quality_score: float = Field(ge=0.0, le=1.0)
+    supporting_weight: float
+    contradicting_weight: float
+    generated_at: str
+
+
+class EvidenceCollectionOut(BaseModel):
+    """Schema for complete evidence collection."""
+    conclusion: str
+    supporting_evidence: list[EvidenceItemOut]
+    contradicting_evidence: list[EvidenceItemOut]
+    missing_evidence: list[EvidenceItemOut]
+    neutral_evidence: list[EvidenceItemOut]
+    summary: EvidenceSummaryOut
+
+
+class ConflictDetectionOut(BaseModel):
+    """Schema for conflict detection results."""
+    type: str
+    description: str
+    supporting_count: int
+    contradicting_count: int
+    severity: str
+
+
+class EvidenceGapOut(BaseModel):
+    """Schema for evidence gap descriptions."""
+    gap_description: str
+    source: str
+    metric: str | None = None
+
+
+class EvidenceReportOut(BaseModel):
+    """Schema for complete evidence report."""
+    conclusion: str
+    collection: EvidenceCollectionOut
+    conflicts: list[ConflictDetectionOut]
+    gaps: list[EvidenceGapOut]
+    generated_report: str
+    total_confidence: float = Field(ge=0.0, le=1.0)
+    evidence_quality_score: float = Field(ge=0.0, le=1.0)
+
+
+# Prediction Tracking Schemas
+
+class PredictionTypeEnum(str, Enum):
+    """Enumeration for prediction types."""
+    DIRECTIONAL = "directional"
+    VOLATILITY = "volatility"
+    REGIME = "regime"
+    PRICE_TARGET = "price_target"
+    SCENARIO = "scenario"
+
+
+class PredictionOutcomeEnum(str, Enum):
+    """Enumeration for prediction outcomes."""
+    CORRECT = "correct"
+    INCORRECT = "incorrect"
+    PARTIAL = "partial"
+    PENDING = "pending"
+    INCONCLUSIVE = "inconclusive"
+    
+    @property
+    def value(self):
+        return self._value_
+
+
+class PredictionCreateIn(BaseModel):
+    """Schema for creating a new prediction."""
+    ticker: str = Field(..., description="Ticker symbol")
+    prediction_type: PredictionTypeEnum = Field(..., description="Type of prediction")
+    prediction_key: str = Field(..., description="Unique key for the prediction")
+    predicted_value: str = Field(..., description="Predicted value (can be text or serialized number)")
+    confidence_score: float = Field(..., ge=0.0, le=1.0, description="Confidence score between 0.0 and 1.0")
+    reasoning: str | None = Field(None, description="Explanation for the prediction")
+    spot_price: float | None = Field(None, description="Current spot price")
+    expiration: str | None = Field(None, description="Options expiration if applicable")
+    market_regime: str | None = Field(None, description="Market regime at prediction time")
+    vix_level: float | None = Field(None, description="VIX level at prediction time")
+    net_gex: float | None = Field(None, description="Net gamma exposure at prediction time")
+    net_dex: float | None = Field(None, description="Net delta exposure at prediction time")
+    target_evaluation_time: datetime | None = Field(None, description="When the prediction should be evaluated")
+
+
+class PredictionOut(BaseModel):
+    """Schema for prediction output."""
+    id: int
+    ticker: str
+    prediction_type: str
+    prediction_key: str
+    predicted_value: str
+    confidence_score: float
+    confidence_adjusted: float | None = None
+    reasoning: str | None = None
+    spot_price: float | None = None
+    expiration: str | None = None
+    market_regime: str | None = None
+    vix_level: float | None = None
+    net_gex: float | None = None
+    net_dex: float | None = None
+    created_at: datetime
+    target_evaluation_time: datetime | None = None
+    evaluated_at: datetime | None = None
+    outcome: str | None = None
+    actual_value: str | None = None
+    error_margin: float | None = None
+    evaluation_notes: str | None = None
+    calibration_error: float | None = None
+    
+    class Config:
+        from_attributes = True
+
+
+class PredictionEvaluateIn(BaseModel):
+    """Schema for evaluating a prediction."""
+    actual_value: str = Field(..., description="Actual observed value")
+    outcome: PredictionOutcomeEnum = Field(..., description="Evaluation outcome")
+    evaluation_method: str = Field(default="automatic", description="Method used for evaluation")
+    notes: str | None = Field(None, description="Additional evaluation notes")
+
+
+class AccuracyMetricsOut(BaseModel):
+    """Schema for accuracy metrics output."""
+    total_predictions: int
+    correct_predictions: int
+    accuracy_rate: float = Field(ge=0.0, le=1.0)
+    precision: float = Field(ge=0.0, le=1.0)
+    recall: float = Field(ge=0.0, le=1.0)
+    f1_score: float = Field(ge=0.0, le=1.0)
+    calibration_error: float = Field(ge=0.0, le=1.0)
+    calibration_score: float = Field(ge=0.0, le=1.0)
+
+
+class ConfidenceAdjustmentOut(BaseModel):
+    """Schema for confidence adjustment output."""
+    original_confidence: float
+    adjusted_confidence: float
+    adjustment_factor: float
+    historical_accuracy: float
+    confidence_level: str
+
+
+class CalibrationReportOut(BaseModel):
+    """Schema for calibration report output."""
+    ticker: str
+    prediction_type: str
+    total_evaluated: int
+    calibration_score: float = Field(ge=0.0, le=1.0)
+    average_calibration_error: float
+    by_confidence_level: dict[str, dict[str, Any]]
+
+
+class PredictionMetricsOut(BaseModel):
+    """Schema for aggregated prediction metrics."""
+    ticker: str
+    prediction_type: str
+    time_window: str
+    total_predictions: int
+    correct_predictions: int
+    accuracy_rate: float
+    avg_precision: float | None = None
+    avg_recall: float | None = None
+    avg_f1: float | None = None
+    avg_confidence: float | None = None
+    avg_calibration_error: float | None = None
+    calibration_score: float | None = None
+    high_conf_accuracy: float | None = None
+    medium_conf_accuracy: float | None = None
+    low_conf_accuracy: float | None = None
+    improving_trend: float | None = None
+    last_updated: datetime
+    
+    class Config:
+        from_attributes = True

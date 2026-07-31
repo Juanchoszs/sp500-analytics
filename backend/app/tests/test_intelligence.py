@@ -124,7 +124,8 @@ def test_intelligence_engine_calculation():
     assert answer_res["answer"] != ""
     
     # 8. Validar Narrative Engine
-    narrative_res = NarrativeEngine.generate_report(
+    narrative_engine_instance = NarrativeEngine()
+    narrative_res = narrative_engine_instance.generate_report(
         ticker="SPY",
         spot=spot,
         expiration_str="2026-07-24",
@@ -135,7 +136,41 @@ def test_intelligence_engine_calculation():
         dealer=dealer_res,
         scores=scores_res,
         confidence=confidence_res,
-        max_pain=report.max_pain
+        max_pain=report.max_pain,
+        include_evidence=True
     )
 
     assert "# INFORME" in narrative_res
+    
+    # 9. Validar Evidence Engine
+    from app.analytics.evidence_engine import EvidenceEngine, EvidenceType, SourceReliability
+    evidence_engine = EvidenceEngine()
+    
+    # Test evidence creation
+    collection = evidence_engine.create_evidence_collection("Test conclusion")
+    assert collection.conclusion == "Test conclusion"
+    assert collection.total_confidence == 0.0  # No evidence yet
+    
+    # Test adding evidence
+    evidence_item = evidence_engine.create_evidence_item(
+        evidence_type=EvidenceType.SUPPORTING,
+        source="Test Source",
+        value=100.0,
+        confidence=0.9,
+        reliability=SourceReliability.HIGH
+    )
+    collection.add_evidence(evidence_item)
+    assert len(collection.supporting_evidence) == 1
+    assert collection.total_confidence > 0.0
+    
+    # Test market analysis
+    market_collection = evidence_engine.analyze_market_conditions(
+        spot=spot,
+        gamma_exposure=gamma_res.net_gamma_exposure,
+        delta_exposure=delta_res.net_delta_exposure,
+        vix=vol_res.vix_current,
+        put_call_ratio=options_res.put_call_volume_ratio,
+        max_pain=report.max_pain
+    )
+    assert market_collection.total_confidence >= 0.0
+    assert len(market_collection.supporting_evidence) > 0 or len(market_collection.contradicting_evidence) > 0

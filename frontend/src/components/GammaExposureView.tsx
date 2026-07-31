@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { marketApi } from "../api/client";
-import { Download } from "lucide-react";
+import { Download, Info, TrendingUp, Shield, Activity } from "lucide-react";
 import { useReportDownload } from "../hooks/useReportDownload";
 import StrikeBarsChart from "./StrikeBarsChart";
 
@@ -19,19 +19,6 @@ export default function GammaExposureView() {
   const [error, setError] = useState<string | null>(null);
   const { isDownloading, handleDownloadWord } = useReportDownload();
 
-  // Control states
-  const [showOnlyPositive, setShowOnlyPositive] = useState(false);
-  const [showOnlyNegative, setShowOnlyNegative] = useState(false);
-  const [activeLayers, setActiveLayers] = useState({
-    heatmap: true,
-    spot: true,
-    candlestick: true,
-    gammaFlip: true,
-    putWall: true,
-    callWall: true,
-    highestGamma: true,
-    zeroGamma: true,
-  });
 
   useEffect(() => {
     marketApi.getExpirations({ ticker: TICKER }).then(setExpirations).catch((e) => setError(String(e)));
@@ -66,7 +53,7 @@ export default function GammaExposureView() {
           <div>
             <h1 className="text-xl font-bold text-white tracking-tight">Gamma Exposure Module</h1>
             <div className="font-mono text-xs text-dim/70 uppercase tracking-wider mt-0.5">
-              {TICKER} Options Market Structure
+              {exposure?.display_ticker || TICKER} Options Market Structure Analysis
             </div>
           </div>
         </div>
@@ -81,10 +68,10 @@ export default function GammaExposureView() {
             ) : (
               <Download className="w-4 h-4 text-accent group-hover:scale-110 transition-transform" />
             )}
-            Descargar Reporte Word
+            Descargar Reporte
           </button>
           <div className="h-8 w-px bg-border" />
-          <label className="font-mono text-xs text-dim/70 uppercase tracking-wider">Exp</label>
+          <label className="font-mono text-xs text-dim/70 uppercase tracking-wider">Vencimiento</label>
           <select
             className="bg-secondary border border-border rounded-lg text-foreground font-mono text-sm px-4 py-2 outline-none focus:border-accent transition-colors"
             value={selectedExp ?? ""}
@@ -98,32 +85,21 @@ export default function GammaExposureView() {
         </div>
       </header>
 
-      {/* Controls Row */}
-      <div className="bg-secondary/50 border-b border-border px-6 py-3">
-        <div className="flex items-center gap-6 flex-wrap">
-          <div className="flex items-center gap-3">
-            <span className="font-mono text-xs uppercase text-dim/70">Filtros</span>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={showOnlyPositive} onChange={(e) => { setShowOnlyPositive(e.target.checked); if (e.target.checked) setShowOnlyNegative(false); }} className="accent-accent" />
-              <span className="text-xs font-mono">Solo Gamma Positivo</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={showOnlyNegative} onChange={(e) => { setShowOnlyNegative(e.target.checked); if (e.target.checked) setShowOnlyPositive(false); }} className="accent-destructive" />
-              <span className="text-xs font-mono">Solo Gamma Negativo</span>
-            </label>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span className="font-mono text-xs uppercase text-dim/70">Capas</span>
-            {Object.entries(activeLayers).map(([key, active]) => (
-              <label key={key} className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={active} onChange={(e) => setActiveLayers(prev => ({ ...prev, [key]: e.target.checked }))} className="accent-accent" />
-                <span className="text-xs font-mono capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-              </label>
-            ))}
+      {/* Info Bar */}
+      <div className="bg-secondary/30 border-b border-border px-6 py-3">
+        <div className="flex items-start gap-3">
+          <Info className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
+          <div className="text-sm">
+            <p className="text-foreground font-medium mb-1">¿Qué es este módulo?</p>
+            <p className="text-dim/70">
+              Analiza la estructura de opciones de {TICKER} para identificar niveles clave donde los dealers (creadores de mercado) deben cubrir sus posiciones. 
+              El <strong className="text-accent">Call Wall</strong> actúa como resistencia magnética, el <strong className="text-destructive">Put Wall</strong> como soporte definitivo, 
+              y el <strong className="text-warning">Zero Gamma</strong> marca el punto de inflexión de volatilidad. Esta información es crucial para entender movimientos intradía y niveles de pinning.
+            </p>
           </div>
         </div>
       </div>
+
 
       {error && (
         <div className="mx-6 mt-6 border border-destructive/40 bg-destructive/10 text-destructive text-sm p-4 rounded-lg font-mono flex items-center gap-3 shadow-lg">
@@ -135,19 +111,73 @@ export default function GammaExposureView() {
       {loading && !exposure && (
         <div className="p-20 flex flex-col items-center justify-center gap-4">
           <div className="w-8 h-8 border-2 border-accent/20 border-t-accent rounded-full animate-spin" />
-          <div className="font-mono text-dim/70 text-sm uppercase tracking-wider animate-pulse">Analizando estructura...</div>
+          <div className="font-mono text-dim/70 text-sm uppercase tracking-wider animate-pulse">Analizando estructura de opciones...</div>
         </div>
       )}
 
       {exposure && (
         <main className="flex-1 p-6 flex flex-col gap-6">
+          {/* Key Metrics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="card p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Activity className="w-4 h-4 text-accent" />
+                <span className="font-mono text-xs text-dim/70 uppercase">Net Gamma</span>
+              </div>
+              <div className="text-2xl font-bold text-white">
+                ${(exposure.net_gamma_exposure / 1000000).toFixed(1)}M
+              </div>
+              <p className="text-xs text-dim/70 mt-1">
+                {exposure.net_gamma_exposure > 0 ? "Régimen Long Gamma (estabilizador)" : "Régimen Short Gamma (desestabilizador)"}
+              </p>
+            </div>
+
+            <div className="card p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingUp className="w-4 h-4 text-accent" />
+                <span className="font-mono text-xs text-dim/70 uppercase">Net Delta</span>
+              </div>
+              <div className="text-2xl font-bold text-white">
+                ${(exposure.net_delta_exposure / 1000000).toFixed(1)}M
+              </div>
+              <p className="text-xs text-dim/70 mt-1">
+                {exposure.net_delta_exposure > 0 ? "Flujo comprador neto" : "Flujo vendedor neto"}
+              </p>
+            </div>
+
+            <div className="card p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Shield className="w-4 h-4 text-accent" />
+                <span className="font-mono text-xs text-dim/70 uppercase">Call Wall</span>
+              </div>
+              <div className="text-2xl font-bold text-white">
+                ${exposure.call_wall || 'N/A'}
+              </div>
+              <p className="text-xs text-dim/70 mt-1">Resistencia magnética principal</p>
+            </div>
+
+            <div className="card p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Shield className="w-4 h-4 text-destructive" />
+                <span className="font-mono text-xs text-dim/70 uppercase">Put Wall</span>
+              </div>
+              <div className="text-2xl font-bold text-white">
+                ${exposure.put_wall || 'N/A'}
+              </div>
+              <p className="text-xs text-dim/70 mt-1">Soporte definitivo del día</p>
+            </div>
+          </div>
+
           {/* Main Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
             {/* Left: Strike Bars Chart */}
-            <div className="lg:col-span-3 card">
+            <div className="lg:col-span-4 card">
               <div className="flex items-center gap-2 mb-4 border-b border-border pb-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-accent" />
-                <h3 className="font-bold text-lg text-foreground">Strike Gamma Bars</h3>
+                <h3 className="font-bold text-lg text-foreground">Strike Gamma & Delta Bars</h3>
+              </div>
+              <div className="text-xs text-dim/70 mb-4">
+                Distribución de gamma (verde/rojo) y delta (azul/púrpura) por strike. Los niveles clave están marcados con líneas punteadas.
               </div>
               <StrikeBarsChart
                 strikes={exposure.strikes}
@@ -155,20 +185,20 @@ export default function GammaExposureView() {
                 callWall={exposure.call_wall}
                 putWall={exposure.put_wall}
                 zeroGamma={exposure.zero_gamma}
-                showOnlyPositive={showOnlyPositive}
-                showOnlyNegative={showOnlyNegative}
               />
             </div>
 
             {/* Center: Multi-layer Heatmap */}
-            <div className="lg:col-span-6 card">
+            <div className="lg:col-span-5 card">
               <div className="flex items-center gap-2 mb-4 border-b border-border pb-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
                 <h3 className="font-bold text-lg text-foreground">Market Structure Heatmap</h3>
               </div>
+              <div className="text-xs text-dim/70 mb-4">
+                Visualización multi-capa de la estructura de mercado. Activa/desactiva capas para analizar diferentes componentes.
+              </div>
               <MultiLayerHeatmap
                 exposure={exposure}
-                activeLayers={activeLayers}
               />
             </div>
 

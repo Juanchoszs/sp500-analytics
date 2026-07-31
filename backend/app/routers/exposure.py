@@ -168,6 +168,7 @@ def get_exposure(
         "strikes": [_strike_to_out(s, report.spot_price).model_dump() for s in report.strikes],
     }
 
+    # Convert SPY to GSPC scale for display
     if ticker == "SPY":
         try:
             index_price = provider.get_index_price("^GSPC")

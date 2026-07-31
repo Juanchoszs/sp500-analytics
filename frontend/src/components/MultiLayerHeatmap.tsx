@@ -21,7 +21,7 @@ import { buildDexChartData, formatCompact, type DexChartPoint } from "./charts/c
 
 interface Props {
   exposure: ExposureResponse;
-  activeLayers: {
+  activeLayers?: {
     heatmap: boolean;
     spot: boolean;
     candlestick: boolean;
@@ -34,6 +34,16 @@ interface Props {
 }
 
 export default function MultiLayerHeatmap({ exposure, activeLayers }: Props) {
+  const layers = activeLayers || {
+    heatmap: true,
+    spot: true,
+    candlestick: true,
+    gammaFlip: true,
+    putWall: true,
+    callWall: true,
+    highestGamma: true,
+    zeroGamma: true,
+  };
   const data = buildDexChartData(exposure.strikes || [], exposure.spot_price);
 
   const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: { payload: DexChartPoint }[] }) => {
@@ -74,7 +84,7 @@ export default function MultiLayerHeatmap({ exposure, activeLayers }: Props) {
 
           <ReferenceLine y={0} stroke="rgba(255,255,255,0.15)" />
 
-          {activeLayers.spot && (
+          {layers.spot && (
             <ReferenceLine
               x={exposure.spot_price.toString()}
               stroke={CHART_COLORS.spot}
@@ -83,7 +93,7 @@ export default function MultiLayerHeatmap({ exposure, activeLayers }: Props) {
             />
           )}
 
-          {activeLayers.callWall && exposure.call_wall && (
+          {layers.callWall && exposure.call_wall && (
             <ReferenceLine
               x={exposure.call_wall.toString()}
               stroke={CHART_COLORS.call}
@@ -92,7 +102,7 @@ export default function MultiLayerHeatmap({ exposure, activeLayers }: Props) {
             />
           )}
 
-          {activeLayers.putWall && exposure.put_wall && (
+          {layers.putWall && exposure.put_wall && (
             <ReferenceLine
               x={exposure.put_wall.toString()}
               stroke={CHART_COLORS.put}
@@ -101,7 +111,7 @@ export default function MultiLayerHeatmap({ exposure, activeLayers }: Props) {
             />
           )}
 
-          {activeLayers.zeroGamma && exposure.zero_gamma && (
+          {layers.zeroGamma && exposure.zero_gamma && (
             <ReferenceLine
               x={exposure.zero_gamma.toString()}
               stroke={CHART_COLORS.zeroGamma}
@@ -110,7 +120,7 @@ export default function MultiLayerHeatmap({ exposure, activeLayers }: Props) {
             />
           )}
 
-          {activeLayers.heatmap && (
+          {layers.heatmap && (
             <>
               <Bar dataKey="callDex" fill={CHART_COLORS.call} fillOpacity={0.8} radius={[2, 2, 0, 0]} name="Call Delta" />
               <Bar dataKey="putDex" fill={CHART_COLORS.put} fillOpacity={0.8} radius={[0, 0, 2, 2]} name="Put Delta" />
