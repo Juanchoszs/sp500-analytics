@@ -75,15 +75,15 @@ export default function AutomaticAnalysisPanel({ exposure }: Props) {
   const analysis = generateAnalysis();
 
   return (
-    <div className="card flex-1">
-      <div className="flex items-center gap-2 mb-4 border-b border-border pb-2">
+    <div className="flex-1">
+      <div className="flex items-center gap-2 mb-4 border-b border-border pb-3">
         <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
         <h3 className="font-bold text-lg text-foreground">Análisis Automático</h3>
       </div>
       
       <div className="space-y-3">
         {analysis.map((insight, index) => (
-          <div key={index} className="p-3 bg-secondary/50 rounded border border-border flex items-start gap-3">
+          <div key={index} className="p-4 bg-secondary/50 rounded-lg border border-border flex items-start gap-3">
             <div className="w-1.5 h-1.5 rounded-full bg-accent mt-2 flex-shrink-0" />
             <p className="text-sm text-dim/70 leading-relaxed">{insight}</p>
           </div>

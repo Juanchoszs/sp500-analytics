@@ -341,6 +341,7 @@ export default function PredictionDashboard() {
                 <span className="font-semibold text-white">Baja Confianza (&lt;40%)</span>
               </div>
               <div className="space-y-2">
+                
                 <div className="flex justify-between text-sm">
                   <span className="text-dim/70">Cantidad:</span>
                   <span className="font-mono text-white">{calibration.by_confidence_level.low.count}</span>

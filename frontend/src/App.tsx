@@ -1,67 +1,47 @@
-import { useState } from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import MainLayout from "./layouts/MainLayout";
+import Overview from "./pages/Overview";
+import MarketStructure from "./pages/MarketStructure";
+import Gamma from "./pages/Gamma";
+import DealerPositioning from "./pages/DealerPositioning";
+import Flow from "./pages/Flow";
+import Liquidity from "./pages/Liquidity";
+import Volatility from "./pages/Volatility";
+import Anomalies from "./pages/Anomalies";
+import PredictionEngine from "./pages/PredictionEngine";
+import Reports from "./pages/Reports";
+import Research from "./pages/Research";
+import Settings from "./pages/Settings";
+
+// Legacy components for fallback
 import Dashboard from "./components/Dashboard";
 import GammaExposureView from "./components/GammaExposureView";
 import PredictionDashboard from "./components/PredictionDashboard";
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<"dashboard" | "gamma" | "predictions">("dashboard");
-
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <nav className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/80 px-6 py-3 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/20">
-              <span className="text-lg font-semibold text-white">S</span>
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-white">S&P 500 Intelligence</p>
-              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400">Options intelligence console</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-slate-900/70 p-1">
-            <button
-              onClick={() => setCurrentView("dashboard")}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
-                currentView === "dashboard"
-                  ? "bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20"
-                  : "text-slate-300 hover:bg-white/5 hover:text-white"
-              }`}
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={() => setCurrentView("gamma")}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
-                currentView === "gamma"
-                  ? "bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20"
-                  : "text-slate-300 hover:bg-white/5 hover:text-white"
-              }`}
-            >
-              Gamma Exposure
-            </button>
-            <button
-              onClick={() => setCurrentView("predictions")}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
-                currentView === "predictions"
-                  ? "bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20"
-                  : "text-slate-300 hover:bg-white/5 hover:text-white"
-              }`}
-            >
-              Prediction Metrics
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      {currentView === "dashboard" ? (
-        <Dashboard />
-      ) : currentView === "gamma" ? (
-        <GammaExposureView />
-      ) : (
-        <PredictionDashboard />
-      )}
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<MainLayout />}>
+          <Route index element={<Overview />} />
+          <Route path="market-structure" element={<MarketStructure />} />
+          <Route path="gamma" element={<Gamma />} />
+          <Route path="dealer-positioning" element={<DealerPositioning />} />
+          <Route path="flow" element={<Flow />} />
+          <Route path="liquidity" element={<Liquidity />} />
+          <Route path="volatility" element={<Volatility />} />
+          <Route path="anomalies" element={<Anomalies />} />
+          <Route path="prediction-engine" element={<PredictionEngine />} />
+          <Route path="reports" element={<Reports />} />
+          <Route path="research" element={<Research />} />
+          <Route path="settings" element={<Settings />} />
+          
+          {/* Legacy routes for fallback */}
+          <Route path="legacy-dashboard" element={<Dashboard />} />
+          <Route path="legacy-gamma" element={<GammaExposureView />} />
+          <Route path="legacy-predictions" element={<PredictionDashboard />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }

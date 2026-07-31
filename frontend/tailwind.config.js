@@ -4,25 +4,61 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: "#020617",
+        // Grises neutros - Paleta institucional sofisticada
+        background: "#020617",      // Casi negro
+        surface: "#0F172A",         // Slate 900
+        "surface-hover": "#1E293B", // Slate 800
+        border: "#1E293B",          // Slate 800
+        "border-light": "#334155",  // Slate 700
+        
+        // Texto
+        "text-primary": "#F8FAFC",   // Slate 50
+        "text-secondary": "#94A3B8", // Slate 400
+        "text-tertiary": "#64748B",  // Slate 500
+        
+        // Acentos informativos (menos saturados)
+        success: "#10B981",         // Emerald 500
+        warning: "#F59E0B",         // Amber 500
+        danger: "#EF4444",          // Red 500
+        info: "#3B82F6",            // Blue 500
+        
+        // Financieros sutiles
+        bullish: "#059669",         // Emerald 600 (más sofisticado)
+        bearish: "#DC2626",         // Red 600 (más sofisticado)
+        neutral: "#6B7280",         // Gray 500
+        
+        // Legacy colors for compatibility
         primary: "#0F172A",
         secondary: "#1E293B",
         accent: "#22C55E",
         foreground: "#F8FAFC",
         muted: "#1A1E2F",
-        border: "#334155",
         destructive: "#EF4444",
         ring: "#0F172A",
-        // Financial specific
-        bullish: "#22C55E",
-        bearish: "#EF4444",
-        neutral: "#F59E0B",
       },
       fontFamily: {
         sans: ["Inter", "sans-serif"],
         mono: ["IBM Plex Mono", "monospace"],
       },
       spacing: {
+        // Retícula base (8px system)
+        base: "8px",
+        
+        // Espaciados generosos
+        "section-gap": "32px",     // gap-8 entre secciones principales
+        "component-gap": "24px",   // gap-6 entre componentes
+        "element-gap": "16px",     // gap-4 entre elementos
+        
+        // Márgenes
+        "page-margin": "48px",     // p-12 márgenes de página
+        "section-margin": "32px",  // p-8 márgenes de sección
+        "card-margin": "24px",     // p-6 márgenes de card
+        
+        // Padding interno
+        "card-padding": "32px",    // p-8 dentro de cards
+        "dense-padding": "24px",   // p-6 para elementos densos
+        
+        // Legacy spacing
         xs: "2px",
         sm: "4px",
         md: "8px",

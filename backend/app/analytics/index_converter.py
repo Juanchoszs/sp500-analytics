@@ -7,13 +7,18 @@ Regla cardinal:
     ratio = GSPC / SPY
 - Los valores de strikes, spot, walls y exposiciones se ajustan a la escala de ^GSPC.
 """
+import logging
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 def calculate_index_ratio(spy_spot: float, gspc_price: float) -> float:
     if spy_spot <= 0 or gspc_price <= 0:
+        logger.warning(f"Invalid prices for ratio calculation: spy_spot={spy_spot}, gspc_price={gspc_price}")
         return 1.0
     return gspc_price / spy_spot
+
 
 
 def convert_strike(strike: float, ratio: float) -> float:

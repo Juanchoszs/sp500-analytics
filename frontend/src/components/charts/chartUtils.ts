@@ -1,6 +1,7 @@
 import type { StrikeExposureOut } from "../../types";
 
 export function formatCompact(value: number): string {
+  if (isNaN(value) || value === null || value === undefined) return "N/A";
   if (value === 0) return "0";
   const abs = Math.abs(value);
   if (abs >= 1_000_000_000) return (value / 1_000_000_000).toFixed(1) + "B";

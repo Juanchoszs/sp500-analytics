@@ -174,7 +174,11 @@ def get_exposure(
             index_price = provider.get_index_price("^GSPC")
             if index_price and report.spot_price > 0:
                 ratio = calculate_index_ratio(report.spot_price, index_price)
-                resp = convert_exposure_dict(resp, ratio, index_price)
+                if 5.0 < ratio < 15.0:  # Validate reasonable SPY -> GSPC ratio (usually ~10)
+                    resp = convert_exposure_dict(resp, ratio, index_price)
+                    logger.info(f"Successfully converted SPY to GSPC scale using ratio: {ratio:.4f}")
+                else:
+                    logger.warning(f"Calculated index ratio {ratio:.4f} seems incorrect for SPY->GSPC, skipping conversion.")
         except Exception as e:
             logger.exception("Failed to fetch index_price for exposure of %s: %s", ticker, e)
 

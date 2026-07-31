@@ -10,6 +10,7 @@ import {
   Cell
 } from 'recharts';
 import type { StrikeExposureOut } from "../types";
+import { formatCompact, closestIndex } from "./charts/chartUtils";
 
 interface Props {
   strikes: StrikeExposureOut[];
@@ -23,9 +24,12 @@ export default function StrikeGammaChart({ strikes, spotPrice, callWall, putWall
   const sorted = [...strikes].sort((a, b) => a.strike - b.strike);
   const spotIdx = closestIndex(sorted, spotPrice);
   
-  // Show all strikes if less than 30, otherwise filter around spot
+  // Dynamic window calculation based on data density
+  const optimalWindow = Math.min(30, Math.max(20, Math.floor(sorted.length / 3)));
+  
+  // Show all strikes if less than optimal window, otherwise filter around spot
   let displayData;
-  if (sorted.length <= 30) {
+  if (sorted.length <= optimalWindow) {
     displayData = sorted.map(s => ({
       strike: s.strike,
       gex: s.gamma_exposure,
@@ -33,9 +37,9 @@ export default function StrikeGammaChart({ strikes, spotPrice, callWall, putWall
       putOi: s.put_oi,
     }));
   } else {
-    // Show ~15 strikes above and below spot
-    const startIndex = Math.max(0, spotIdx - 15);
-    const endIndex = Math.min(sorted.length - 1, spotIdx + 15);
+    // Show dynamic window around spot
+    const startIndex = Math.max(0, spotIdx - Math.floor(optimalWindow / 2));
+    const endIndex = Math.min(sorted.length - 1, spotIdx + Math.ceil(optimalWindow / 2));
     
     displayData = sorted.slice(startIndex, endIndex + 1).map(s => ({
       strike: s.strike,
@@ -114,21 +118,4 @@ export default function StrikeGammaChart({ strikes, spotPrice, callWall, putWall
       </ResponsiveContainer>
     </div>
   );
-}
-
-function formatCompact(value: number): string {
-  const abs = Math.abs(value);
-  if (abs >= 1_000_000_000) return (value / 1_000_000_000).toFixed(2) + "B";
-  if (abs >= 1_000_000) return (value / 1_000_000).toFixed(2) + "M";
-  if (abs >= 1_000) return (value / 1_000).toFixed(1) + "K";
-  return value.toFixed(0);
-}
-
-function closestIndex(sorted: StrikeExposureOut[], value: number): number {
-  let best = 0, bestDiff = Infinity;
-  sorted.forEach((s, i) => {
-    const diff = Math.abs(s.strike - value);
-    if (diff < bestDiff) { bestDiff = diff; best = i; }
-  });
-  return best;
 }
