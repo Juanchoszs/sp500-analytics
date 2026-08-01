@@ -11,18 +11,20 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
 
-# Paleta institucional profesional con alto contraste
+# Paleta institucional profesional - colores sobrios y corporativos
 COLORS = {
-    "call": "#00C853",  # Verde brillante para calls
-    "put": "#FF1744",  # Rojo brillante para puts
-    "net": "#2979FF",  # Azul para net
-    "spot": "#212121",
-    "zero_gamma": "#FF9100",
+    "call": "#1B5E20",  # Verde oscuro institucional para calls
+    "put": "#B71C1C",  # Rojo oscuro institucional para puts
+    "net": "#0D47A1",  # Azul corporativo oscuro para net
+    "spot": "#263238",  # Gris oscuro para spot
+    "zero_gamma": "#E65100",  # Naranja oscuro para zero gamma
     "bg": "#FFFFFF",  # Fondo blanco para mejor legibilidad
-    "grid": "#E0E0E0",  # Grid suave
-    "text": "#212121",  # Texto negro para contraste
-    "muted": "#757575",  # Texto secundario
-    "highlight": "#FF1744",  # Para anomalías o alertas
+    "grid": "#ECEFF1",  # Grid muy suave
+    "text": "#37474F",  # Texto gris oscuro para contraste suave
+    "muted": "#78909C",  # Texto secundario
+    "highlight": "#C62828",  # Para anomalías o alertas
+    "call_light": "#4CAF50",  # Verde más claro para acentos
+    "put_light": "#EF5350",  # Rojo más claro para acentos
 }
 
 
@@ -79,7 +81,7 @@ def generate_gex_chart(exposure: dict[str, Any]) -> bytes:
     colors = [COLORS["call"] if v >= 0 else COLORS["put"] for v in gex]
 
     fig, ax = _base_figure("Gamma Exposure por Strike", "Strike", "GEX ($ por 1% movimiento)")
-    ax.bar(x, gex, width=0.8, color=colors, alpha=0.85, edgecolor="none")
+    ax.bar(x, gex, width=0.8, color=colors, alpha=0.75, edgecolor="#37474F", linewidth=0.5)
     ax.axvline(exposure["spot_price"], color=COLORS["text"], linestyle="--", linewidth=1.2, alpha=0.7, label="Spot")
     if exposure.get("zero_gamma"):
         ax.axvline(exposure["zero_gamma"], color=COLORS["zero_gamma"], linestyle="-.", linewidth=1.5, label="Gamma Flip")
@@ -103,9 +105,9 @@ def generate_dex_chart(exposure: dict[str, Any]) -> bytes:
 
     fig, ax = _base_figure("Delta Exposure por Strike (Convención Dealer)", "Strike", "DEX ($ por 1 pt movimiento)")
     width = 0.35
-    ax.bar(x - width / 2, call_dex, width=width, color=COLORS["call"], alpha=0.8, label="Call Delta")
-    ax.bar(x + width / 2, put_dex, width=width, color=COLORS["put"], alpha=0.8, label="Put Delta")
-    ax.plot(x, net_dex, color=COLORS["net"], linewidth=2.0, marker="o", markersize=3, label="Net Delta", zorder=5)
+    ax.bar(x - width / 2, call_dex, width=width, color=COLORS["call"], alpha=0.7, edgecolor="#37474F", linewidth=0.5, label="Call Delta")
+    ax.bar(x + width / 2, put_dex, width=width, color=COLORS["put"], alpha=0.7, edgecolor="#37474F", linewidth=0.5, label="Put Delta")
+    ax.plot(x, net_dex, color=COLORS["net"], linewidth=2.5, marker="o", markersize=4, label="Net Delta", zorder=5)
     ax.axhline(0, color=COLORS["muted"], linewidth=1.0, alpha=0.6)
     ax.axvline(exposure["spot_price"], color=COLORS["text"], linestyle="--", linewidth=1.2, alpha=0.7, label="Spot")
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(_format_axis))
@@ -122,9 +124,9 @@ def generate_oi_chart(exposure: dict[str, Any]) -> bytes:
 
     fig, ax = _base_figure("Open Interest por Strike", "Strike", "Contratos (Puts invertidos)")
     width = 0.35
-    ax.bar(x - width / 2, call_oi, width=width, color=COLORS["call"], alpha=0.85, label="Call OI")
-    ax.bar(x + width / 2, put_oi, width=width, color=COLORS["put"], alpha=0.85, label="Put OI")
-    ax.plot(x, total, color=COLORS["net"], linewidth=2.0, linestyle="--", label="Total OI", zorder=5)
+    ax.bar(x - width / 2, call_oi, width=width, color=COLORS["call"], alpha=0.7, edgecolor="#37474F", linewidth=0.5, label="Call OI")
+    ax.bar(x + width / 2, put_oi, width=width, color=COLORS["put"], alpha=0.7, edgecolor="#37474F", linewidth=0.5, label="Put OI")
+    ax.plot(x, total, color=COLORS["net"], linewidth=2.5, linestyle="--", label="Total OI", zorder=5)
     ax.axhline(0, color=COLORS["muted"], linewidth=1.0, alpha=0.6)
     ax.axvline(exposure["spot_price"], color=COLORS["text"], linestyle="--", linewidth=1.2, alpha=0.7, label="Spot")
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(_format_axis))
@@ -141,9 +143,9 @@ def generate_volume_chart(exposure: dict[str, Any]) -> bytes:
 
     fig, ax = _base_figure("Volumen por Strike", "Strike", "Contratos (Puts invertidos)")
     width = 0.35
-    ax.bar(x - width / 2, call_vol, width=width, color=COLORS["call"], alpha=0.85, label="Call Volume")
-    ax.bar(x + width / 2, put_vol, width=width, color=COLORS["put"], alpha=0.85, label="Put Volume")
-    ax.plot(x, net_vol, color=COLORS["net"], linewidth=2.0, marker="o", markersize=3, label="Net Volume", zorder=5)
+    ax.bar(x - width / 2, call_vol, width=width, color=COLORS["call"], alpha=0.7, edgecolor="#37474F", linewidth=0.5, label="Call Volume")
+    ax.bar(x + width / 2, put_vol, width=width, color=COLORS["put"], alpha=0.7, edgecolor="#37474F", linewidth=0.5, label="Put Volume")
+    ax.plot(x, net_vol, color=COLORS["net"], linewidth=2.5, marker="o", markersize=4, label="Net Volume", zorder=5)
     ax.axhline(0, color=COLORS["muted"], linewidth=1.0, alpha=0.6)
     ax.axvline(exposure["spot_price"], color=COLORS["text"], linestyle="--", linewidth=1.2, alpha=0.7, label="Spot")
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(_format_axis))

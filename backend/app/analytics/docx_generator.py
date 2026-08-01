@@ -52,7 +52,7 @@ class SectionGenerator(ABC):
         """Apply standard formatting to paragraph."""
         for run in p.runs:
             run.font.size = Pt(11)
-            run.font.color.rgb = RGBColor(0, 0, 0)
+            run.font.color.rgb = COLORS["text"]
 
 
 class ExecutiveSummaryGenerator(SectionGenerator):
@@ -105,7 +105,7 @@ class AssetDataGenerator(SectionGenerator):
             for run in p.runs:
                 run.font.size = Pt(10)
                 run.font.italic = True
-                run.font.color.rgb = RGBColor(80, 80, 80)
+                run.font.color.rgb = COLORS["muted"]
         
         return section_num + 1
 
@@ -156,7 +156,7 @@ class GammaExposureGenerator(SectionGenerator):
             for run in p.runs:
                 run.font.size = Pt(10)
                 run.font.italic = True
-                run.font.color.rgb = RGBColor(80, 80, 80)
+                run.font.color.rgb = COLORS["muted"]
         
         p = self.doc.add_paragraph(
             f"Exposición gamma neta: {_fmt_money(analytics_exposure.get('net_gamma_exposure'))}. "
@@ -257,7 +257,7 @@ class StructuralLevelsGenerator(SectionGenerator):
 
 
 class DetailedAnalysisGenerator(SectionGenerator):
-    """Generator for detailed analysis section."""
+    """Generator for detailed analysis section with enhanced formatting."""
     
     def add(self, report: dict, analytics_exposure: dict, chart_exposure: dict,
             chart_source: str | None = None, chart_ratio: float | None = None,
@@ -265,7 +265,9 @@ class DetailedAnalysisGenerator(SectionGenerator):
         _add_heading(self.doc, f"{section_num}. Análisis Cuantitativo Detallado")
         
         narrative_text = _g(report, 'narrative', '') or ''
-        for line in str(narrative_text).split("\n"):
+        lines = str(narrative_text).split("\n")
+        
+        for line in lines:
             if line.startswith("# "):
                 _add_heading(self.doc, line[2:], level=2)
             elif line.startswith("## "):
@@ -275,11 +277,36 @@ class DetailedAnalysisGenerator(SectionGenerator):
             elif line.startswith("- ") or line.startswith("* "):
                 p = self.doc.add_paragraph(line[2:], style="List Bullet")
                 for run in p.runs:
-                    run.font.color.rgb = RGBColor(0, 0, 0)
+                    run.font.color.rgb = COLORS["text"]
+                    run.font.size = Pt(11)
+            elif line.startswith("**") and line.endswith("**"):
+                # Texto en negrita
+                p = self.doc.add_paragraph(line[2:-2])
+                for run in p.runs:
+                    run.font.bold = True
+                    run.font.color.rgb = COLORS["accent"]
+                    run.font.size = Pt(11)
+            elif line.startswith("* ") and "*" in line[2:-2]:
+                # Texto con énfasis (italics)
+                p = self.doc.add_paragraph(line[2:-2])
+                for run in p.runs:
+                    run.font.italic = True
+                    run.font.color.rgb = COLORS["muted"]
+                    run.font.size = Pt(11)
             elif line.strip():
+                # Texto normal con mejor formato
                 p = self.doc.add_paragraph(line)
                 for run in p.runs:
-                    run.font.color.rgb = RGBColor(0, 0, 0)
+                    run.font.color.rgb = COLORS["text"]
+                    run.font.size = Pt(11)
+                    # Detectar palabras clave para resaltar
+                    text = run.text
+                    if "riesgo" in text.lower() or "alerta" in text.lower() or "peligro" in text.lower():
+                        run.font.color.rgb = COLORS["secondary"]
+                        run.font.bold = True
+                    elif "oportunidad" in text.lower() or "positivo" in text.lower() or "favorable" in text.lower():
+                        run.font.color.rgb = COLORS["primary"]
+                        run.font.bold = True
         
         return section_num + 1
 
@@ -304,31 +331,34 @@ class ScenariosGenerator(SectionGenerator):
             prob_str = f"{prob}%" if prob is not None else "N/A"
             run = p.add_run(f"Probabilidad: {prob_str} | Confianza: {conf}")
             run.bold = True
-            run.font.color.rgb = RGBColor(0, 0, 0)
+            run.font.color.rgb = COLORS["accent"]
 
             narrative_sc = _g(sc, "narrative", "")
             if narrative_sc:
                 p = self.doc.add_paragraph(str(narrative_sc))
                 for run in p.runs:
-                    run.font.color.rgb = RGBColor(0, 0, 0)
+                    run.font.color.rgb = COLORS["text"]
+                    run.font.size = Pt(11)
 
             p = self.doc.add_paragraph("Factores de soporte:", style="List Bullet")
             for run in p.runs:
                 run.font.bold = True
-                run.font.color.rgb = RGBColor(0, 0, 0)
+                run.font.color.rgb = COLORS["primary"]
             for sf in (_g(sc, "supporting_factors", []) or []):
                 p = self.doc.add_paragraph(str(sf), style="List Bullet")
                 for run in p.runs:
-                    run.font.color.rgb = RGBColor(0, 0, 0)
+                    run.font.color.rgb = COLORS["text"]
+                    run.font.size = Pt(11)
 
             p = self.doc.add_paragraph("Condiciones de invalidación:", style="List Bullet")
             for run in p.runs:
                 run.font.bold = True
-                run.font.color.rgb = RGBColor(0, 0, 0)
+                run.font.color.rgb = COLORS["secondary"]
             for inv in (_g(sc, "invalidation_conditions", []) or []):
                 p = self.doc.add_paragraph(str(inv), style="List Bullet")
                 for run in p.runs:
-                    run.font.color.rgb = RGBColor(0, 0, 0)
+                    run.font.color.rgb = COLORS["text"]
+                    run.font.size = Pt(11)
         
         return section_num + 1
 
@@ -348,21 +378,26 @@ class ConclusionsGenerator(SectionGenerator):
             f"{_g(_g(scenarios_obj, 'principal', {}), 'narrative', '')}"
         )
         for run in p.runs:
-            run.font.color.rgb = RGBColor(0, 0, 0)
+            run.font.color.rgb = COLORS["primary"]
+            run.font.bold = True
+            run.font.size = Pt(11)
 
         p = self.doc.add_paragraph(
             f"Riesgo de cola ({_g(_g(scenarios_obj, 'risk', {}), 'probability_pct', 'N/A')}): "
             f"{_g(_g(scenarios_obj, 'risk', {}), 'narrative', '')}"
         )
         for run in p.runs:
-            run.font.color.rgb = RGBColor(0, 0, 0)
+            run.font.color.rgb = COLORS["secondary"]
+            run.font.bold = True
+            run.font.size = Pt(11)
 
         p = self.doc.add_paragraph(
             f"Score de riesgo: {_g(_g(report, 'scores', {}), 'risk_score', 0):.0f}%. "
             f"Volatilidad esperada: {_g(_g(report, 'volatility_analysis', {}), 'description', '')}"
         )
         for run in p.runs:
-            run.font.color.rgb = RGBColor(0, 0, 0)
+            run.font.color.rgb = COLORS["text"]
+            run.font.size = Pt(11)
         
         return section_num + 1
 
@@ -399,18 +434,30 @@ def _fmt_num(value: float | None, suffix: str = "") -> str:
     return f"{value:.2f}{suffix}"
 
 
+# Colores institucionales profesionales
+COLORS = {
+    "primary": RGBColor(27, 94, 32),  # Verde oscuro institucional
+    "secondary": RGBColor(183, 28, 28),  # Rojo oscuro institucional
+    "accent": RGBColor(13, 71, 161),  # Azul corporativo oscuro
+    "text": RGBColor(55, 71, 79),  # Gris oscuro para texto
+    "muted": RGBColor(120, 144, 156),  # Texto secundario
+    "highlight": RGBColor(230, 81, 0),  # Naranja para destacados
+    "black": RGBColor(0, 0, 0),  # Negro puro
+}
+
+
 def _add_heading(doc: Document, text: str, level: int = 1):
     h = doc.add_heading(text, level=level)
     for run in h.runs:
-        run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
+        run.font.color.rgb = COLORS["primary"] if level == 1 else COLORS["accent"] if level == 2 else COLORS["text"]
         run.font.bold = True
-        run.font.size = Pt(18) if level == 1 else Pt(16) if level == 2 else Pt(14)
+        run.font.size = Pt(20) if level == 1 else Pt(16) if level == 2 else Pt(14)
     return h
 
 
 def _add_kv_table(doc: Document, rows: list[tuple[str, str]]):
     table = doc.add_table(rows=len(rows), cols=2)
-    table.style = "Table Grid"
+    table.style = "Light Grid Accent 1"
     
     # Ajustar ancho de columnas
     for row in table.rows:
@@ -420,12 +467,18 @@ def _add_kv_table(doc: Document, rows: list[tuple[str, str]]):
     for i, (key, val) in enumerate(rows):
         table.rows[i].cells[0].text = key
         table.rows[i].cells[1].text = val
-        for cell in table.rows[i].cells:
-            for p in cell.paragraphs:
-                for run in p.runs:
-                    run.font.size = Pt(11)
-                    run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
-                    run.font.bold = True
+        # Formato de celda de clave
+        for p in table.rows[i].cells[0].paragraphs:
+            for run in p.runs:
+                run.font.size = Pt(11)
+                run.font.color.rgb = COLORS["primary"]
+                run.font.bold = True
+        # Formato de celda de valor
+        for p in table.rows[i].cells[1].paragraphs:
+            for run in p.runs:
+                run.font.size = Pt(11)
+                run.font.color.rgb = COLORS["text"]
+                run.font.bold = False
 
 def _add_chart(doc: Document, png_bytes: bytes | None, caption: str):
     doc.add_paragraph()
@@ -439,7 +492,7 @@ def _add_chart(doc: Document, png_bytes: bytes | None, caption: str):
     for run in cap.runs:
         run.font.size = Pt(11)
         run.font.italic = True
-        run.font.color.rgb = RGBColor(0, 0, 0)  # Negro puro
+        run.font.color.rgb = COLORS["muted"]
 
 
 def _executive_summary(report: dict, exposure: dict, display_ticker: str | None = None) -> str:
@@ -496,14 +549,22 @@ def generate_docx_report(
     section.page_width = Inches(8.5)
     section.page_height = Inches(11)
     
-    # Título y metadata
+    # Título y metadata con mejor diseño
     original_ticker = _g(report, 'ticker', 'UNKNOWN')
     display_ticker = chart_source if chart_source and chart_source != original_ticker else original_ticker
     title = doc.add_heading(f"Reporte de Inteligencia de Mercado — {display_ticker}", 0)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     for run in title.runs:
-        run.font.size = Pt(20)
-        run.font.color.rgb = RGBColor(0, 0, 0)
+        run.font.size = Pt(22)
+        run.font.color.rgb = COLORS["primary"]
+        run.font.bold = True
+
+    # Línea separadora decorativa
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = p.add_run("=" * 50)
+    run.font.color.rgb = COLORS["muted"]
+    run.font.size = Pt(8)
 
     subtitle = doc.add_paragraph()
     subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -512,8 +573,11 @@ def generate_docx_report(
     fetched_str = fetched_val[:19] if isinstance(fetched_val, str) else str(fetched_val)
     run = subtitle.add_run(f"Vencimiento: {expiration_val}  |  Generado: {fetched_str} UTC")
     run.bold = True
-    run.font.size = Pt(12)
-    run.font.color.rgb = RGBColor(0, 0, 0)
+    run.font.size = Pt(11)
+    run.font.color.rgb = COLORS["muted"]
+    
+    # Espacio adicional
+    doc.add_paragraph()
 
     # Build generators based on config
     generators = []
